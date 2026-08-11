@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { Check, X, Clock, Minus, Plus, Trash2, ChevronLeft, ChevronRight, Users, CalendarDays, BookOpen, Loader2 } from "lucide-react";
+import { Check, X, Clock, Minus, Plus, Trash2, ChevronLeft, ChevronRight, Users, CalendarDays, BookOpen, Loader2, Download, Building2 } from "lucide-react";
+import * as XLSX from "xlsx";
 
 const STATUS = {
   present: { key: "present", label: "Present", short: "P", color: "#2F6F5E" },
@@ -22,6 +23,29 @@ function uid() {
   return Math.random().toString(36).slice(2, 10);
 }
 
+// Sites that represent the office/HQ rather than a client premises.
+// Anything else typed into the "site" field is treated as a client name.
+const OFFICE_ALIASES = new Set(["office", "hq", "head office", "main office", ""]);
+
+function isClientSite(site) {
+  if (!site) return false;
+  return !OFFICE_ALIASES.has(site.trim().toLowerCase());
+}
+
+// Excel sheet names: max 31 chars, no \ / ? * [ ]
+function safeSheetName(name, usedNames) {
+  let base = String(name).replace(/[\\/?*[\]]/g, "-").slice(0, 31).trim() || "Sheet";
+  let candidate = base;
+  let n = 2;
+  while (usedNames.has(candidate.toLowerCase())) {
+    const suffix = ` (${n})`;
+    candidate = base.slice(0, 31 - suffix.length) + suffix;
+    n += 1;
+  }
+  usedNames.add(candidate.toLowerCase());
+  return candidate;
+}
+
 export default function AttendanceTracker() {
   const [loading, setLoading] = useState(true);
   const [saveError, setSaveError] = useState(false);
@@ -34,6 +58,7 @@ export default function AttendanceTracker() {
   const [newEmpRole, setNewEmpRole] = useState("");
   const [siteDrafts, setSiteDrafts] = useState({});
   const [confirmClear, setConfirmClear] = useState(false);
+  const [exportNote, setExportNote] = useState("");
 
   useEffect(() => {
     try {
@@ -138,6 +163,119 @@ export default function AttendanceTracker() {
     return stats;
   }, [attendance, employees, monthDays, registerMonth]);
 
+  // ---------- Excel export: full monthly register ----------
+  const exportMonthlyRegister = () => {
+    const y = registerMonth.getFullYear();
+    const m = registerMonth.getMonth();
+    const monthName = monthLabel(registerMonth);
+
+    const header = ["Employee", "Role", ...monthDays.map((d) => String(d)), "Present %"];
+    const rows = employees.map((emp) => {
+      const cells = monthDays.map((day) => {
+        const ds = fmtDate(new Date(y, m, day));
+        const rec = attendance[`${emp.id}__${ds}`];
+        return rec ? STATUS[rec.status].short : "";
+      });
+      const pct = monthStats[emp.id];
+      return [emp.name, emp.role, ...cells, pct == null ? "" : `${pct}%`];
+    });
+
+    const wsData = [
+      [`Monthly Attendance Register — ${monthName}`],
+      [],
+      header,
+      ...rows,
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    ws["!cols"] = [{ wch: 22 }, { wch: 16 }, ...monthDays.map(() => ({ wch: 4 })), { wch: 10 }];
+    ws["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: header.length - 1 } }];
+
+    // Legend sheet
+    const legendData = [
+      ["Code", "Meaning"],
+      ...Object.values(STATUS).map((s) => [s.short, s.label]),
+    ];
+    const wsLegend = XLSX.utils.aoa_to_sheet(legendData);
+    wsLegend["!cols"] = [{ wch: 8 }, { wch: 16 }];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Register");
+    XLSX.utils.book_append_sheet(wb, wsLegend, "Legend");
+
+    const fname = `Attendance_Register_${monthName.replace(" ", "_")}.xlsx`;
+    XLSX.writeFile(wb, fname);
+    setExportNote(`Downloaded ${fname}`);
+    setTimeout(() => setExportNote(""), 4000);
+  };
+
+  // ---------- Excel export: client-wise report ----------
+  const exportClientWiseReport = () => {
+    const y = registerMonth.getFullYear();
+    const m = registerMonth.getMonth();
+    const monthName = monthLabel(registerMonth);
+
+    // Build { clientName: [ {date, employee, role} ] }
+    const byClient = {};
+    employees.forEach((emp) => {
+      monthDays.forEach((day) => {
+        const ds = fmtDate(new Date(y, m, day));
+        const rec = attendance[`${emp.id}__${ds}`];
+        if (rec && rec.status === "present" && isClientSite(rec.site)) {
+          const client = rec.site.trim();
+          if (!byClient[client]) byClient[client] = [];
+          byClient[client].push({ date: ds, employee: emp.name, role: emp.role });
+        }
+      });
+    });
+
+    const clientNames = Object.keys(byClient).sort((a, b) => a.localeCompare(b));
+
+    if (clientNames.length === 0) {
+      setExportNote("No client-site attendance found for this month.");
+      setTimeout(() => setExportNote(""), 4000);
+      return;
+    }
+
+    const wb = XLSX.utils.book_new();
+    const usedNames = new Set();
+
+    // Summary sheet: client vs total attendance-days + unique employees
+    const summaryRows = clientNames.map((c) => {
+      const entries = byClient[c];
+      const uniqueEmps = new Set(entries.map((e) => e.employee));
+      return [c, entries.length, uniqueEmps.size];
+    });
+    const wsSummary = XLSX.utils.aoa_to_sheet([
+      [`Client-wise Attendance Summary — ${monthName}`],
+      [],
+      ["Client", "Total Attendance-Days", "Employees Involved"],
+      ...summaryRows,
+    ]);
+    wsSummary["!cols"] = [{ wch: 26 }, { wch: 20 }, { wch: 18 }];
+    wsSummary["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 2 } }];
+    XLSX.utils.book_append_sheet(wb, wsSummary, safeSheetName("Summary", usedNames));
+
+    // One sheet per client
+    clientNames.forEach((client) => {
+      const entries = byClient[client].sort((a, b) => a.date.localeCompare(b.date) || a.employee.localeCompare(b.employee));
+      const wsData = [
+        [client],
+        [],
+        ["Date", "Employee", "Role"],
+        ...entries.map((e) => [e.date, e.employee, e.role]),
+      ];
+      const ws = XLSX.utils.aoa_to_sheet(wsData);
+      ws["!cols"] = [{ wch: 14 }, { wch: 22 }, { wch: 16 }];
+      ws["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 2 } }];
+      XLSX.utils.book_append_sheet(wb, ws, safeSheetName(client, usedNames));
+    });
+
+    const fname = `Client_Wise_Report_${monthName.replace(" ", "_")}.xlsx`;
+    XLSX.writeFile(wb, fname);
+    setExportNote(`Downloaded ${fname} (${clientNames.length} client${clientNames.length === 1 ? "" : "s"})`);
+    setTimeout(() => setExportNote(""), 4000);
+  };
+
   if (loading) {
     return (
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 320, color: "#6B6456", fontFamily: "Inter, sans-serif" }}>
@@ -164,7 +302,7 @@ export default function AttendanceTracker() {
         .adm-body { padding: 22px 24px 26px 24px; }
         .adm-row-line { border-bottom: 1px solid #E4DCC4; }
         .adm-mono { font-family: 'IBM Plex Mono', monospace; }
-        .adm-date-nav { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
+        .adm-date-nav { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; flex-wrap: wrap; }
         .adm-date-btn { background: #F0EBD8; border: 1px solid #E4DCC4; border-radius: 6px; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #1B3A32; }
         .adm-date-btn:hover { background: #E4DCC4; }
         .adm-date-label { font-family: 'Roboto Slab', serif; font-weight: 700; font-size: 16px; color: #1B3A32; min-width: 210px; }
@@ -182,6 +320,8 @@ export default function AttendanceTracker() {
         .adm-btn-primary:hover { background: #244C42; }
         .adm-btn-danger { display: flex; align-items: center; gap: 6px; background: transparent; color: #A13D3D; border: 1px solid #E9C6C6; padding: 8px 14px; border-radius: 6px; font-size: 12px; cursor: pointer; }
         .adm-btn-danger:hover { background: #FBF0F0; }
+        .adm-btn-export { display: flex; align-items: center; gap: 6px; background: #F0EBD8; color: #1B3A32; border: 1px solid #D8D0BC; padding: 8px 14px; border-radius: 6px; font-size: 12px; font-weight: 500; cursor: pointer; }
+        .adm-btn-export:hover { background: #E4DCC4; }
         .emp-list-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; }
         table.reg-table { border-collapse: collapse; width: 100%; font-size: 11px; }
         table.reg-table th, table.reg-table td { padding: 4px; text-align: center; }
@@ -193,6 +333,8 @@ export default function AttendanceTracker() {
         .legend-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: #6B6456; }
         .legend-swatch { width: 12px; height: 12px; border-radius: 3px; }
         .stat-pct { font-family: 'IBM Plex Mono', monospace; font-size: 12px; font-weight: 600; }
+        .export-bar { display: flex; gap: 10px; margin-bottom: 18px; flex-wrap: wrap; align-items: center; }
+        .export-note { font-size: 11px; color: #2F6F5E; font-family: 'IBM Plex Mono', monospace; }
       `}</style>
 
       <div className="adm-header">
@@ -257,7 +399,7 @@ export default function AttendanceTracker() {
                       {currentStatus === "present" && (
                         <input
                           className="site-input"
-                          placeholder="Office / client site"
+                          placeholder="Office / client name"
                           value={siteDrafts[key] ?? rec?.site ?? ""}
                           onChange={(e) => setSiteDrafts({ ...siteDrafts, [key]: e.target.value })}
                           onBlur={(e) => setStatus(emp.id, selectedDateStr, "present", e.target.value)}
@@ -297,6 +439,16 @@ export default function AttendanceTracker() {
               <button className="adm-date-btn" onClick={() => setRegisterMonth(new Date(registerMonth.getFullYear(), registerMonth.getMonth() + 1, 1))}>
                 <ChevronRight size={15} />
               </button>
+            </div>
+
+            <div className="export-bar">
+              <button className="adm-btn-export" onClick={exportMonthlyRegister} disabled={employees.length === 0}>
+                <Download size={13} /> Export monthly register (Excel)
+              </button>
+              <button className="adm-btn-export" onClick={exportClientWiseReport} disabled={employees.length === 0}>
+                <Building2 size={13} /> Export client-wise report (Excel)
+              </button>
+              {exportNote && <span className="export-note">{exportNote}</span>}
             </div>
 
             <div className="legend">
@@ -412,7 +564,7 @@ export default function AttendanceTracker() {
               )}
             </div>
           </div>
-        )}
+        )}  
       </div>
     </div>
   );
