@@ -1,12 +1,30 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { Check, X, Clock, Minus, Plus, Trash2, ChevronLeft, ChevronRight, Users, CalendarDays, BookOpen, Loader2, Download, Building2, CloudCheck, RefreshCw, AlertCircle } from "lucide-react";
+import { 
+  Check, 
+  X, 
+  Clock, 
+  Minus, 
+  Plus, 
+  Trash2, 
+  ChevronLeft, 
+  ChevronRight, 
+  Users, 
+  CalendarDays, 
+  BookOpen, 
+  Loader2, 
+  Download, 
+  Building2, 
+  RefreshCw, 
+  AlertCircle 
+} from "lucide-react";
 import * as XLSX from "xlsx";
+import "./App.css";
 
 const STATUS = {
-  present: { key: "present", label: "Present", short: "P", color: "#2F6F5E" },
-  absent: { key: "absent", label: "Absent", short: "A", color: "#A13D3D" },
-  leave: { key: "leave", label: "Leave", short: "L", color: "#C08A2E" },
-  half: { key: "half", label: "Half Day", short: "H", color: "#6B6456" },
+  present: { key: "present", label: "Present", short: "P", color: "#166534" },
+  absent: { key: "absent", label: "Absent", short: "A", color: "#991b1b" },
+  leave: { key: "leave", label: "Leave", short: "L", color: "#854d0e" },
+  half: { key: "half", label: "Half Day", short: "H", color: "#475569" },
 };
 const STATUS_CYCLE = ["present", "absent", "leave", "half", null];
 
@@ -16,9 +34,11 @@ function fmtDate(d) {
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
 }
+
 function monthLabel(d) {
   return d.toLocaleDateString("en-US", { month: "long", year: "numeric" });
 }
+
 function uid() {
   return Math.random().toString(36).slice(2, 10);
 }
@@ -50,7 +70,7 @@ export default function AttendanceTracker() {
   const [saveError, setSaveError] = useState(false);
   const [saveErrorMessage, setSaveErrorMessage] = useState("");
   const [employees, setEmployees] = useState([]);
-  const [attendance, setAttendance] = useState({}); // key: empId__YYYY-MM-DD -> {status, site}
+  const [attendance, setAttendance] = useState({});
   const [tab, setTab] = useState("today");
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [registerMonth, setRegisterMonth] = useState(new Date());
@@ -59,9 +79,7 @@ export default function AttendanceTracker() {
   const [siteDrafts, setSiteDrafts] = useState({});
   const [confirmClear, setConfirmClear] = useState(false);
   const [exportNote, setExportNote] = useState("");
-  const [lastSynced, setLastSynced] = useState(null);
 
-  // Fetch data from Supabase backend API
   const fetchData = useCallback(async (isInitial = false) => {
     if (isInitial) setLoading(true);
     else setIsSyncing(true);
@@ -75,9 +93,7 @@ export default function AttendanceTracker() {
         setEmployees(data.employees || []);
         setAttendance(data.attendance || {});
         setDbConnected(true);
-        setLastSynced(new Date());
         
-        // Cache locally as backup
         try {
           localStorage.setItem("adm-employees", JSON.stringify(data.employees || []));
           localStorage.setItem("adm-attendance", JSON.stringify(data.attendance || {}));
@@ -86,10 +102,9 @@ export default function AttendanceTracker() {
         throw new Error(data.error || "Failed to fetch");
       }
     } catch (err) {
-      console.warn("Cloud sync error (using local cache fallback):", err.message);
+      console.warn("Sync error, fallback to local cache:", err.message);
       setDbConnected(false);
       
-      // Fallback to local storage if network request fails
       if (isInitial) {
         try {
           const empRaw = localStorage.getItem("adm-employees");
@@ -104,34 +119,23 @@ export default function AttendanceTracker() {
     }
   }, []);
 
-  // Initial load and periodic polling every 3 seconds for multi-user sync
   useEffect(() => {
     fetchData(true);
-
-    const interval = setInterval(() => {
-      fetchData(false);
-    }, 3000);
-
-    const handleFocus = () => {
-      fetchData(false);
-    };
+    const interval = setInterval(() => fetchData(false), 3000);
+    const handleFocus = () => fetchData(false);
     window.addEventListener("focus", handleFocus);
-
     return () => {
       clearInterval(interval);
       window.removeEventListener("focus", handleFocus);
     };
   }, [fetchData]);
 
-  // Add Employee
   const addEmployee = async () => {
     const name = newEmpName.trim();
     if (!name) return;
     const newEmp = { id: uid(), name, role: newEmpRole.trim() || "Staff" };
     
-    // Optimistic UI update
-    const nextEmps = [...employees, newEmp];
-    setEmployees(nextEmps);
+    setEmployees((prev) => [...prev, newEmp]);
     setNewEmpName("");
     setNewEmpRole("");
 
@@ -145,33 +149,25 @@ export default function AttendanceTracker() {
       if (!data.success) throw new Error(data.error);
       fetchData(false);
     } catch (e) {
-      console.error("Save employee error:", e);
       setSaveError(true);
-      setSaveErrorMessage("Failed to save employee to Supabase cloud database.");
+      setSaveErrorMessage("Failed to save employee to database.");
     }
   };
 
-  // Remove Employee
   const removeEmployee = async (id) => {
-    // Optimistic UI update
-    const nextEmps = employees.filter((e) => e.id !== id);
-    setEmployees(nextEmps);
+    setEmployees((prev) => prev.filter((e) => e.id !== id));
 
     try {
-      const res = await fetch(`/api/employees/${id}`, {
-        method: "DELETE"
-      });
+      const res = await fetch(`/api/employees/${id}`, { method: "DELETE" });
       const data = await res.json();
       if (!data.success) throw new Error(data.error);
       fetchData(false);
     } catch (e) {
-      console.error("Remove employee error:", e);
       setSaveError(true);
-      setSaveErrorMessage("Failed to remove employee from Supabase database.");
+      setSaveErrorMessage("Failed to remove employee.");
     }
   };
 
-  // Set Attendance Status
   const setStatus = async (empId, dateStr, status, site) => {
     const key = `${empId}__${dateStr}`;
     const nextAtt = { ...attendance };
@@ -183,28 +179,20 @@ export default function AttendanceTracker() {
       nextAtt[key] = { status, site: currentSite };
     }
 
-    // Optimistic UI update
     setAttendance(nextAtt);
 
     try {
       const res = await fetch("/api/attendance", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: key,
-          empId,
-          dateStr,
-          status,
-          site: currentSite
-        })
+        body: JSON.stringify({ id: key, empId, dateStr, status, site: currentSite })
       });
       const data = await res.json();
       if (!data.success) throw new Error(data.error);
       fetchData(false);
     } catch (e) {
-      console.error("Save attendance error:", e);
       setSaveError(true);
-      setSaveErrorMessage("Failed to sync attendance to Supabase database.");
+      setSaveErrorMessage("Failed to sync attendance.");
     }
   };
 
@@ -227,9 +215,8 @@ export default function AttendanceTracker() {
       if (!data.success) throw new Error(data.error);
       fetchData(false);
     } catch (e) {
-      console.error("Clear data error:", e);
       setSaveError(true);
-      setSaveErrorMessage("Failed to clear cloud database.");
+      setSaveErrorMessage("Failed to clear database.");
     }
   };
 
@@ -261,7 +248,6 @@ export default function AttendanceTracker() {
     return stats;
   }, [attendance, employees, monthDays, registerMonth]);
 
-  // ---------- Excel export: full monthly register ----------
   const exportMonthlyRegister = () => {
     const y = registerMonth.getFullYear();
     const m = registerMonth.getMonth();
@@ -305,7 +291,6 @@ export default function AttendanceTracker() {
     setTimeout(() => setExportNote(""), 4000);
   };
 
-  // ---------- Excel export: client-wise report ----------
   const exportClientWiseReport = () => {
     const y = registerMonth.getFullYear();
     const m = registerMonth.getMonth();
@@ -372,320 +357,285 @@ export default function AttendanceTracker() {
 
   if (loading) {
     return (
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: 360, color: "#1B3A32", fontFamily: "Inter, sans-serif" }}>
-        <Loader2 size={24} style={{ marginBottom: 12, animation: "spin 1s linear infinite", color: "#A9823B" }} />
-        <div style={{ fontWeight: 600, fontSize: 15 }}>Connecting to Supabase Cloud Database…</div>
-        <div style={{ fontSize: 12, color: "#8A8371", marginTop: 4 }}>Synchronizing live attendance register</div>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100vh" }}>
+        <Loader2 size={24} style={{ animation: "spin 1s linear infinite", marginBottom: 10, color: "#0f172a" }} />
+        <span style={{ fontSize: 14, color: "#64748b" }}>Loading register...</span>
       </div>
     );
   }
 
   return (
-    <div className="adm-root">
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Roboto+Slab:wght@500;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
-        .adm-root { font-family: 'Inter', sans-serif; color: #26231F; background: #FAF7EF; border-radius: 10px; overflow: hidden; border: 1px solid #E4DCC4; max-width: 920px; margin: 0 auto; }
-        @keyframes spin { to { transform: rotate(360deg); } }
-        .adm-header { background: #1B3A32; color: #F3EFDF; padding: 20px 24px 0 24px; position: relative; }
-        .adm-header-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; flex-wrap: wrap; gap: 10px; }
-        .adm-title-row { display: flex; align-items: center; gap: 10px; }
-        .adm-title { font-family: 'Roboto Slab', serif; font-weight: 700; font-size: 20px; letter-spacing: 0.2px; }
-        .adm-subtitle { font-size: 12px; color: #B7C9C1; margin-top: 2px; font-family: 'IBM Plex Mono', monospace; }
-        .adm-badge { display: flex; align-items: center; gap: 6px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); padding: 4px 10px; border-radius: 20px; font-size: 11px; font-family: 'IBM Plex Mono', monospace; color: #E8F5E9; }
-        .pulse-dot { width: 8px; height: 8px; border-radius: 50%; background: #4CAF50; box-shadow: 0 0 8px #4CAF50; display: inline-block; }
-        .pulse-dot.warning { background: #FFC107; box-shadow: 0 0 8px #FFC107; }
-        .adm-tabs { display: flex; gap: 4px; }
-        .adm-tab { display: flex; align-items: center; gap: 6px; padding: 9px 16px; font-size: 13px; font-weight: 500; color: #C7D6CF; background: transparent; border: none; border-bottom: 2px solid transparent; cursor: pointer; font-family: 'Inter', sans-serif; }
-        .adm-tab.active { color: #F3EFDF; border-bottom: 2px solid #A9823B; }
-        .adm-tab:hover:not(.active) { color: #F3EFDF; }
-        .adm-body { padding: 22px 24px 26px 24px; }
-        .adm-row-line { border-bottom: 1px solid #E4DCC4; }
-        .adm-mono { font-family: 'IBM Plex Mono', monospace; }
-        .adm-date-nav { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; flex-wrap: wrap; }
-        .adm-date-btn { background: #F0EBD8; border: 1px solid #E4DCC4; border-radius: 6px; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #1B3A32; }
-        .adm-date-btn:hover { background: #E4DCC4; }
-        .adm-date-label { font-family: 'Roboto Slab', serif; font-weight: 700; font-size: 16px; color: #1B3A32; min-width: 210px; }
-        .emp-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; gap: 12px; }
-        .emp-name { font-weight: 600; font-size: 14px; }
-        .emp-role { font-size: 11px; color: #8A8371; font-family: 'IBM Plex Mono', monospace; margin-top: 1px; }
-        .status-btns { display: flex; gap: 6px; align-items: center; }
-        .status-btn { display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 6px; border: 1.5px solid #E4DCC4; background: #fff; cursor: pointer; transition: transform 0.08s ease; }
-        .status-btn:hover { transform: translateY(-1px); }
-        .site-input { font-size: 12px; padding: 6px 8px; border: 1px solid #E4DCC4; border-radius: 5px; font-family: 'Inter', sans-serif; width: 150px; background: #FCFAF3; }
-        .empty-state { text-align: center; padding: 40px 20px; color: #8A8371; font-size: 13px; }
-        .add-emp-form { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
-        .adm-input { padding: 9px 12px; border: 1px solid #E4DCC4; border-radius: 6px; font-size: 13px; font-family: 'Inter', sans-serif; background: #fff; flex: 1; min-width: 140px; }
-        .adm-btn-primary { display: flex; align-items: center; gap: 6px; background: #1B3A32; color: #F3EFDF; border: none; padding: 9px 16px; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; }
-        .adm-btn-primary:hover { background: #244C42; }
-        .adm-btn-danger { display: flex; align-items: center; gap: 6px; background: transparent; color: #A13D3D; border: 1px solid #E9C6C6; padding: 8px 14px; border-radius: 6px; font-size: 12px; cursor: pointer; }
-        .adm-btn-danger:hover { background: #FBF0F0; }
-        .adm-btn-export { display: flex; align-items: center; gap: 6px; background: #F0EBD8; color: #1B3A32; border: 1px solid #D8D0BC; padding: 8px 14px; border-radius: 6px; font-size: 12px; font-weight: 500; cursor: pointer; }
-        .adm-btn-export:hover { background: #E4DCC4; }
-        .emp-list-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; }
-        table.reg-table { border-collapse: collapse; width: 100%; font-size: 11px; }
-        table.reg-table th, table.reg-table td { padding: 4px; text-align: center; }
-        table.reg-table th { font-family: 'IBM Plex Mono', monospace; font-weight: 500; color: #8A8371; font-size: 10px; border-bottom: 1.5px solid #D8D0BC; }
-        table.reg-table td.emp-col, table.reg-table th.emp-col { text-align: left; position: sticky; left: 0; background: #FAF7EF; padding-right: 10px; min-width: 110px; }
-        .reg-cell { width: 22px; height: 22px; border-radius: 4px; margin: 0 auto; display: flex; align-items: center; justify-content: center; font-family: 'IBM Plex Mono', monospace; font-weight: 600; font-size: 10px; cursor: pointer; border: 1px solid #EDE7D6; color: #fff; }
-        .reg-cell.empty { background: #FCFAF3; color: #C9C1A9; border: 1px dashed #E4DCC4; }
-        .legend { display: flex; gap: 14px; margin-bottom: 14px; flex-wrap: wrap; }
-        .legend-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: #6B6456; }
-        .legend-swatch { width: 12px; height: 12px; border-radius: 3px; }
-        .stat-pct { font-family: 'IBM Plex Mono', monospace; font-size: 12px; font-weight: 600; }
-        .export-bar { display: flex; gap: 10px; margin-bottom: 18px; flex-wrap: wrap; align-items: center; }
-        .export-note { font-size: 11px; color: #2F6F5E; font-family: 'IBM Plex Mono', monospace; }
-      `}</style>
-
-      <div className="adm-header">
-        <div className="adm-header-top">
-          <div className="adm-title-row">
-            <BookOpen size={20} color="#A9823B" />
-            <div>
-              <div className="adm-title">Attendance Register</div>
-              <div className="adm-subtitle">{employees.length} {employees.length === 1 ? "employee" : "employees"} on file</div>
-            </div>
-          </div>
-          <div className="adm-badge" title="All users are connected live to the same Supabase database">
-            <span className={`pulse-dot ${dbConnected ? "" : "warning"}`} />
-            <span>{dbConnected ? "Supabase Cloud Shared" : "Offline Cache"}</span>
-            {isSyncing ? (
-              <RefreshCw size={11} style={{ animation: "spin 1s linear infinite", marginLeft: 4 }} />
-            ) : (
-              <button 
-                onClick={() => fetchData(false)} 
-                title="Sync now" 
-                style={{ background: "none", border: "none", color: "inherit", cursor: "pointer", padding: 0, marginLeft: 4, display: "flex" }}
-              >
-                <RefreshCw size={11} />
-              </button>
-            )}
-          </div>
-        </div>
-
-        <div className="adm-tabs">
-          <button className={`adm-tab ${tab === "today" ? "active" : ""}`} onClick={() => setTab("today")}>
-            <CalendarDays size={14} /> Mark Attendance
-          </button>
-          <button className={`adm-tab ${tab === "register" ? "active" : ""}`} onClick={() => setTab("register")}>
-            <BookOpen size={14} /> Monthly Register
-          </button>
-          <button className={`adm-tab ${tab === "employees" ? "active" : ""}`} onClick={() => setTab("employees")}>
-            <Users size={14} /> Employees
-          </button>
-        </div>
-      </div>
-
-      <div className="adm-body">
-        {saveError && (
-          <div style={{ background: "#FBF0F0", border: "1px solid #E9C6C6", color: "#A13D3D", fontSize: 12, padding: "8px 12px", borderRadius: 6, marginBottom: 14, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <AlertCircle size={14} />
-              <span>{saveErrorMessage || "Couldn't save to database. Check network connection."}</span>
-            </div>
-            <button onClick={() => setSaveError(false)} style={{ background: "none", border: "none", color: "#A13D3D", cursor: "pointer", fontWeight: "bold" }}>✕</button>
-          </div>
-        )}
-
-        {tab === "today" && (
-          <div>
-            <div className="adm-date-nav">
-              <button className="adm-date-btn" onClick={() => setSelectedDate(new Date(selectedDate.getTime() - 86400000))}>
-                <ChevronLeft size={15} />
-              </button>
-              <div className="adm-date-label">
-                {selectedDate.toLocaleDateString("en-US", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
-              </div>
-              <button className="adm-date-btn" onClick={() => setSelectedDate(new Date(selectedDate.getTime() + 86400000))}>
-                <ChevronRight size={15} />
-              </button>
-              <button className="adm-btn-danger" style={{ marginLeft: "auto", color: "#1B3A32", borderColor: "#D8D0BC" }} onClick={() => setSelectedDate(new Date())}>
-                Today
-              </button>
+    <div className="app-wrapper">
+      <div className="app-card">
+        
+        {/* Header */}
+        <div className="app-header">
+          <div className="header-top">
+            <div className="header-title-group">
+              <h1>Attendance Register</h1>
+              <p>{employees.length} {employees.length === 1 ? "employee" : "employees"}</p>
             </div>
 
-            {employees.length === 0 ? (
-              <div className="empty-state">No employees yet. Add your team in the Employees tab first.</div>
-            ) : (
-              employees.map((emp) => {
-                const key = `${emp.id}__${selectedDateStr}`;
-                const rec = attendance[key];
-                const currentStatus = rec?.status;
-                return (
-                  <div className="emp-row adm-row-line" key={emp.id}>
-                    <div>
-                      <div className="emp-name">{emp.name}</div>
-                      <div className="emp-role">{emp.role}</div>
-                    </div>
-                    <div className="status-btns">
-                      {currentStatus === "present" && (
-                        <input
-                          className="site-input"
-                          placeholder="Office / client name"
-                          value={siteDrafts[key] ?? rec?.site ?? ""}
-                          onChange={(e) => setSiteDrafts({ ...siteDrafts, [key]: e.target.value })}
-                          onBlur={(e) => setStatus(emp.id, selectedDateStr, "present", e.target.value)}
-                        />
-                      )}
-                      {["present", "absent", "leave", "half"].map((s) => {
-                        const meta = STATUS[s];
-                        const isActive = currentStatus === s;
-                        const Icon = s === "present" ? Check : s === "absent" ? X : s === "leave" ? Minus : Clock;
-                        return (
-                          <button
-                            key={s}
-                            className="status-btn"
-                            title={meta.label}
-                            style={isActive ? { background: meta.color, borderColor: meta.color, color: "#fff" } : { color: meta.color }}
-                            onClick={() => setStatus(emp.id, selectedDateStr, isActive ? null : s)}
-                          >
-                            <Icon size={15} />
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-        )}
-
-        {tab === "register" && (
-          <div>
-            <div className="adm-date-nav">
-              <button className="adm-date-btn" onClick={() => setRegisterMonth(new Date(registerMonth.getFullYear(), registerMonth.getMonth() - 1, 1))}>
-                <ChevronLeft size={15} />
-              </button>
-              <div className="adm-date-label">{monthLabel(registerMonth)}</div>
-              <button className="adm-date-btn" onClick={() => setRegisterMonth(new Date(registerMonth.getFullYear(), registerMonth.getMonth() + 1, 1))}>
-                <ChevronRight size={15} />
-              </button>
-            </div>
-
-            <div className="export-bar">
-              <button className="adm-btn-export" onClick={exportMonthlyRegister} disabled={employees.length === 0}>
-                <Download size={13} /> Export monthly register (Excel)
-              </button>
-              <button className="adm-btn-export" onClick={exportClientWiseReport} disabled={employees.length === 0}>
-                <Building2 size={13} /> Export client-wise report (Excel)
-              </button>
-              {exportNote && <span className="export-note">{exportNote}</span>}
-            </div>
-
-            <div className="legend">
-              {Object.values(STATUS).map((s) => (
-                <div className="legend-item" key={s.key}>
-                  <span className="legend-swatch" style={{ background: s.color }} />
-                  {s.label} ({s.short})
-                </div>
-              ))}
-              <div className="legend-item">Click a cell to cycle status. Attendance % counts half-days as 0.5.</div>
-            </div>
-
-            {employees.length === 0 ? (
-              <div className="empty-state">No employees yet. Add your team in the Employees tab first.</div>
-            ) : (
-              <div style={{ overflowX: "auto" }}>
-                <table className="reg-table">
-                  <thead>
-                    <tr>
-                      <th className="emp-col">Employee</th>
-                      {monthDays.map((d) => <th key={d}>{d}</th>)}
-                      <th>%</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {employees.map((emp) => (
-                      <tr key={emp.id}>
-                        <td className="emp-col">
-                          <div className="emp-name" style={{ fontSize: 12 }}>{emp.name}</div>
-                        </td>
-                        {monthDays.map((day) => {
-                          const ds = fmtDate(new Date(registerMonth.getFullYear(), registerMonth.getMonth(), day));
-                          const rec = attendance[`${emp.id}__${ds}`];
-                          const meta = rec ? STATUS[rec.status] : null;
-                          return (
-                            <td key={day}>
-                              <div
-                                className={`reg-cell ${meta ? "" : "empty"}`}
-                                style={meta ? { background: meta.color } : {}}
-                                title={meta ? `${meta.label}${rec.site ? " — " + rec.site : ""}` : "Not marked"}
-                                onClick={() => cycleStatus(emp.id, ds)}
-                              >
-                                {meta ? meta.short : ""}
-                              </div>
-                            </td>
-                          );
-                        })}
-                        <td>
-                          <span className="stat-pct" style={{ color: monthStats[emp.id] == null ? "#C9C1A9" : "#1B3A32" }}>
-                            {monthStats[emp.id] == null ? "—" : `${monthStats[emp.id]}%`}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        )}
-
-        {tab === "employees" && (
-          <div>
-            <div className="add-emp-form">
-              <input
-                className="adm-input"
-                placeholder="Employee name"
-                value={newEmpName}
-                onChange={(e) => setNewEmpName(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && addEmployee()}
-              />
-              <input
-                className="adm-input"
-                placeholder="Role (e.g. Audit Associate)"
-                value={newEmpRole}
-                onChange={(e) => setNewEmpRole(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && addEmployee()}
-              />
-              <button className="adm-btn-primary" onClick={addEmployee}>
-                <Plus size={14} /> Add
-              </button>
-            </div>
-
-            {employees.length === 0 ? (
-              <div className="empty-state">No employees yet — add your first one above.</div>
-            ) : (
-              employees.map((emp) => (
-                <div className="emp-list-row adm-row-line" key={emp.id}>
-                  <div>
-                    <div className="emp-name">{emp.name}</div>
-                    <div className="emp-role">{emp.role}</div>
-                  </div>
-                  <button className="adm-btn-danger" onClick={() => removeEmployee(emp.id)}>
-                    <Trash2 size={13} /> Remove
-                  </button>
-                </div>
-              ))
-            )}
-
-            <div style={{ marginTop: 30, paddingTop: 18, borderTop: "1px dashed #E4DCC4" }}>
-              {!confirmClear ? (
-                <button className="adm-btn-danger" onClick={() => setConfirmClear(true)}>
-                  <Trash2 size={13} /> Clear all data
-                </button>
+            <div className="sync-badge">
+              <span className={`status-dot ${dbConnected ? "" : "offline"}`} />
+              <span>{dbConnected ? "Connected" : "Offline"}</span>
+              {isSyncing ? (
+                <RefreshCw size={11} style={{ animation: "spin 1s linear infinite", marginLeft: 4 }} />
               ) : (
-                <div style={{ fontSize: 12, color: "#A13D3D" }}>
-                  This removes every employee and attendance record from Supabase Cloud. This can't be undone.
-                  <div style={{ marginTop: 8, display: "flex", gap: 8 }}>
-                    <button className="adm-btn-danger" onClick={clearAllData}>Yes, clear everything</button>
-                    <button className="adm-date-btn" style={{ width: "auto", padding: "0 14px" }} onClick={() => setConfirmClear(false)}>Cancel</button>
-                  </div>
-                </div>
+                <button 
+                  onClick={() => fetchData(false)} 
+                  style={{ background: "none", border: "none", cursor: "pointer", padding: 0, marginLeft: 4, display: "flex", color: "#64748b" }}
+                >
+                  <RefreshCw size={11} />
+                </button>
               )}
             </div>
           </div>
-        )}  
+
+          {/* Navigation Tabs */}
+          <div className="nav-tabs">
+            <button className={`nav-tab ${tab === "today" ? "active" : ""}`} onClick={() => setTab("today")}>
+              <CalendarDays size={15} /> Mark Attendance
+            </button>
+            <button className={`nav-tab ${tab === "register" ? "active" : ""}`} onClick={() => setTab("register")}>
+              <BookOpen size={15} /> Monthly Register
+            </button>
+            <button className={`nav-tab ${tab === "employees" ? "active" : ""}`} onClick={() => setTab("employees")}>
+              <Users size={15} /> Employees
+            </button>
+          </div>
+        </div>
+
+        {/* Body Content */}
+        <div className="app-body">
+          {saveError && (
+            <div style={{ background: "#fef2f2", border: "1px solid #fca5a5", color: "#991b1b", padding: "10px 14px", borderRadius: 6, marginBottom: 16, fontSize: 13, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <AlertCircle size={15} />
+                <span>{saveErrorMessage}</span>
+              </div>
+              <button onClick={() => setSaveError(false)} style={{ background: "none", border: "none", cursor: "pointer", fontWeight: "bold", color: "#991b1b" }}>✕</button>
+            </div>
+          )}
+
+          {/* Tab 1: Mark Attendance */}
+          {tab === "today" && (
+            <div>
+              <div className="date-nav">
+                <div className="date-controls">
+                  <button className="btn-icon" onClick={() => setSelectedDate(new Date(selectedDate.getTime() - 86400000))}>
+                    <ChevronLeft size={16} />
+                  </button>
+                  <span className="date-heading">
+                    {selectedDate.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })}
+                  </span>
+                  <button className="btn-icon" onClick={() => setSelectedDate(new Date(selectedDate.getTime() + 86400000))}>
+                    <ChevronRight size={16} />
+                  </button>
+                </div>
+
+                <button className="btn-secondary" onClick={() => setSelectedDate(new Date())}>
+                  Today
+                </button>
+              </div>
+
+              {employees.length === 0 ? (
+                <div style={{ textAlign: "center", padding: "40px 0", color: "#64748b", fontSize: 14 }}>
+                  No employees found. Add employees in the Employees tab.
+                </div>
+              ) : (
+                employees.map((emp) => {
+                  const key = `${emp.id}__${selectedDateStr}`;
+                  const rec = attendance[key];
+                  const currentStatus = rec?.status;
+
+                  return (
+                    <div className="emp-card" key={emp.id}>
+                      <div className="emp-info">
+                        <div className="emp-info-name">{emp.name}</div>
+                        <div className="emp-info-role">{emp.role}</div>
+                      </div>
+
+                      <div className="emp-actions">
+                        {currentStatus === "present" && (
+                          <input
+                            className="site-input-field"
+                            placeholder="Office / Client site"
+                            value={siteDrafts[key] ?? rec?.site ?? ""}
+                            onChange={(e) => setSiteDrafts({ ...siteDrafts, [key]: e.target.value })}
+                            onBlur={(e) => setStatus(emp.id, selectedDateStr, "present", e.target.value)}
+                          />
+                        )}
+
+                        <div className="status-button-group">
+                          {["present", "absent", "leave", "half"].map((s) => {
+                            const meta = STATUS[s];
+                            const isActive = currentStatus === s;
+                            return (
+                              <button
+                                key={s}
+                                className={`status-btn-item ${isActive ? `active-${meta.short}` : ""}`}
+                                title={meta.label}
+                                onClick={() => setStatus(emp.id, selectedDateStr, isActive ? null : s)}
+                              >
+                                {meta.short}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          )}
+
+          {/* Tab 2: Monthly Register */}
+          {tab === "register" && (
+            <div>
+              <div className="date-nav">
+                <div className="date-controls">
+                  <button className="btn-icon" onClick={() => setRegisterMonth(new Date(registerMonth.getFullYear(), registerMonth.getMonth() - 1, 1))}>
+                    <ChevronLeft size={16} />
+                  </button>
+                  <span className="date-heading">{monthLabel(registerMonth)}</span>
+                  <button className="btn-icon" onClick={() => setRegisterMonth(new Date(registerMonth.getFullYear(), registerMonth.getMonth() + 1, 1))}>
+                    <ChevronRight size={16} />
+                  </button>
+                </div>
+              </div>
+
+              <div className="export-actions">
+                <button className="btn-secondary" onClick={exportMonthlyRegister} disabled={employees.length === 0}>
+                  <Download size={14} /> Export Register (Excel)
+                </button>
+                <button className="btn-secondary" onClick={exportClientWiseReport} disabled={employees.length === 0}>
+                  <Building2 size={14} /> Export Client Report (Excel)
+                </button>
+                {exportNote && <span style={{ fontSize: 12, color: "#166534", alignSelf: "center" }}>{exportNote}</span>}
+              </div>
+
+              <div className="legend-bar">
+                {Object.values(STATUS).map((s) => (
+                  <div className="legend-tag" key={s.key}>
+                    <span className="legend-box" style={{ background: s.color }} />
+                    <span>{s.label} ({s.short})</span>
+                  </div>
+                ))}
+              </div>
+
+              {employees.length === 0 ? (
+                <div style={{ textAlign: "center", padding: "40px 0", color: "#64748b", fontSize: 14 }}>
+                  No employees found.
+                </div>
+              ) : (
+                <div className="table-scroll-container">
+                  <table className="register-table">
+                    <thead>
+                      <tr>
+                        <th className="emp-head">Employee</th>
+                        {monthDays.map((d) => <th key={d}>{d}</th>)}
+                        <th>%</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {employees.map((emp) => (
+                        <tr key={emp.id}>
+                          <td className="emp-cell">
+                            <div style={{ fontWeight: 600, color: "#0f172a" }}>{emp.name}</div>
+                          </td>
+                          {monthDays.map((day) => {
+                            const ds = fmtDate(new Date(registerMonth.getFullYear(), registerMonth.getMonth(), day));
+                            const rec = attendance[`${emp.id}__${ds}`];
+                            const meta = rec ? STATUS[rec.status] : null;
+
+                            return (
+                              <td key={day}>
+                                <div
+                                  className={`table-cell-badge ${meta ? `cell-${meta.short}` : "cell-empty"}`}
+                                  title={meta ? `${meta.label}${rec.site ? " — " + rec.site : ""}` : "Not marked"}
+                                  onClick={() => cycleStatus(emp.id, ds)}
+                                >
+                                  {meta ? meta.short : ""}
+                                </div>
+                              </td>
+                            );
+                          })}
+                          <td>
+                            <span style={{ fontWeight: 600, color: monthStats[emp.id] == null ? "#94a3b8" : "#0f172a" }}>
+                              {monthStats[emp.id] == null ? "—" : `${monthStats[emp.id]}%`}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Tab 3: Employees */}
+          {tab === "employees" && (
+            <div>
+              <div className="add-form">
+                <input
+                  className="text-input"
+                  placeholder="Employee name"
+                  value={newEmpName}
+                  onChange={(e) => setNewEmpName(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && addEmployee()}
+                />
+                <input
+                  className="text-input"
+                  placeholder="Role (e.g. Associate)"
+                  value={newEmpRole}
+                  onChange={(e) => setNewEmpRole(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && addEmployee()}
+                />
+                <button className="btn-primary" onClick={addEmployee}>
+                  <Plus size={15} /> Add Employee
+                </button>
+              </div>
+
+              {employees.length === 0 ? (
+                <div style={{ textAlign: "center", padding: "30px 0", color: "#64748b", fontSize: 14 }}>
+                  No employees yet. Add your first employee above.
+                </div>
+              ) : (
+                employees.map((emp) => (
+                  <div className="emp-card" key={emp.id}>
+                    <div>
+                      <div className="emp-info-name">{emp.name}</div>
+                      <div className="emp-info-role">{emp.role}</div>
+                    </div>
+                    <button className="btn-danger" onClick={() => removeEmployee(emp.id)}>
+                      <Trash2 size={14} /> Remove
+                    </button>
+                  </div>
+                ))
+              )}
+
+              <div style={{ marginTop: 32, paddingTop: 20, borderTop: "1px solid #e2e8f0" }}>
+                {!confirmClear ? (
+                  <button className="btn-danger" onClick={() => setConfirmClear(true)}>
+                    <Trash2 size={14} /> Clear all data
+                  </button>
+                ) : (
+                  <div style={{ fontSize: 13, color: "#991b1b" }}>
+                    This permanently deletes all employees and attendance logs from Supabase.
+                    <div style={{ marginTop: 10, display: "flex", gap: 10 }}>
+                      <button className="btn-danger" onClick={clearAllData}>Confirm Clear</button>
+                      <button className="btn-secondary" onClick={() => setConfirmClear(false)}>Cancel</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+        </div>
       </div>
     </div>
   );
