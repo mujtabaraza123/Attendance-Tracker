@@ -1,4 +1,4 @@
-/* Full-Page Modern App Layout with Bubble Font */
+/* Full-Page App Layout with Exclusively Bubble Font */
 
 :root {
   --bg-main: #f8fafc;
@@ -22,8 +22,8 @@
   --status-half-bg: #f1f5f9;
 }
 
-body, html, input, button, select, textarea, table {
-  font-family: 'Bubblegum Sans', 'Fredoka', cursive, sans-serif !important;
+*, *::before, *::after, body, html, input, button, select, textarea, table, th, td, h1, h2, h3, p, span, div {
+  font-family: 'Bubblegum Sans', 'Bubbler One', 'Bubble', cursive !important;
 }
 
 body, html {
