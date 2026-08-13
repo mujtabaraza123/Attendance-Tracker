@@ -240,24 +240,21 @@ input, button, select, textarea { font-family: inherit; }
 .btn-ghost:hover { background: #f1f5f9; color: var(--charcoal); }
 .btn-ghost:disabled { opacity: 0.4; cursor: not-allowed; }
 
-/* ── OTP Boxes ────────────────────────────────────────────── */
-.otp-grid {
-  display: flex; gap: 8px; justify-content: center;
-  padding: 8px 0;
+/* ── OTP sent note ───────────────────────────────────────── */
+.otp-sent-note {
+  font-size: 13px;
+  color: #16a34a;
+  font-weight: 600;
+  margin-bottom: 4px;
 }
-.otp-box {
-  width: 48px; height: 56px;
-  border: 1.5px solid var(--border);
-  border-radius: var(--radius-md);
+
+/* ── OTP plain text input ────────────────────────────────── */
+.otp-text-input {
+  font-size: 22px !important;
+  font-weight: 700 !important;
+  letter-spacing: 6px;
   text-align: center;
-  font-size: 22px; font-weight: 800;
-  color: var(--charcoal); background: var(--white);
-  outline: none;
-  transition: all 0.15s;
-  caret-color: transparent;
 }
-.otp-box:focus { border-color: var(--charcoal); box-shadow: 0 0 0 3px rgba(15,23,42,0.08); }
-.otp-box.otp-filled { border-color: var(--charcoal); background: #f8fafc; }
 
 .otp-actions {
   display: flex; justify-content: space-between; align-items: center;
@@ -559,10 +556,6 @@ input, button, select, textarea { font-family: inherit; }
   /* Role pills — smaller on mobile */
   .role-select-grid { gap: 5px; }
   .role-option { font-size: 12px; padding: 6px 12px; }
-
-  /* OTP boxes — slightly smaller */
-  .otp-box { width: 40px; height: 50px; font-size: 20px; }
-  .otp-grid { gap: 6px; }
 
   /* Main app */
   .topbar-inner { padding: 10px 12px; }

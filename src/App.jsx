@@ -478,15 +478,27 @@ export default function App() {
             ) : (
               <>
                 <div className="auth-header">
-                  <h2>Verify Email</h2>
-                  <p>Enter the 6-digit code sent to <strong>{loginEmail}</strong></p>
+                  <h2>Check your inbox</h2>
+                  <p>We sent a verification code to <strong>{loginEmail}</strong></p>
                 </div>
 
                 {loginError && <div className="auth-alert error">{loginError}</div>}
-                {loginSuccess && <div className="auth-alert success">{loginSuccess}</div>}
+                {loginSuccess && <p className="otp-sent-note">{loginSuccess}</p>}
 
                 <form onSubmit={handleVerifyOtp} className="auth-form">
-                  <OtpInput value={otp} onChange={setOtp} />
+                  <div className="field-group">
+                    <label>Enter 6-digit code</label>
+                    <input
+                      className="field-input otp-text-input"
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="e.g. 482910"
+                      maxLength={6}
+                      value={otp}
+                      onChange={e => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                      autoFocus
+                    />
+                  </div>
 
                   <button type="submit" className="btn-primary" disabled={loginLoading || otp.replace(/\D/g,"").length < 6}>
                     {loginLoading
