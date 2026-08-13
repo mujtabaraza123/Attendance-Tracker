@@ -370,10 +370,19 @@ input, button { font-family: inherit; }
 /* ── Mobile ─────────────────────────────────────────────── */
 @media (max-width: 600px) {
   /* Auth */
-  .auth-page { padding: 0; align-items: stretch; background: var(--wh); }
+  .auth-page {
+    padding: 20px 16px;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    background: var(--bg);
+  }
   .auth-box {
-    border: none; border-radius: 0; max-width: 100%;
-    min-height: 100vh; padding: 28px 20px 48px;
+    border: 1px solid var(--bd);
+    border-radius: 16px;
+    max-width: 380px;
+    width: 100%;
+    padding: 24px 20px;
   }
 
   /* Header */
