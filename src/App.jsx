@@ -14,17 +14,16 @@ import {
   Loader2, 
   Download, 
   Building2, 
-  RefreshCw, 
   AlertCircle 
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import "./App.css";
 
 const STATUS = {
-  present: { key: "present", label: "Present", short: "P", color: "#166534" },
-  absent: { key: "absent", label: "Absent", short: "A", color: "#991b1b" },
-  leave: { key: "leave", label: "Leave", short: "L", color: "#854d0e" },
-  half: { key: "half", label: "Half Day", short: "H", color: "#475569" },
+  present: { key: "present", label: "Present", short: "P", color: "#0f766e" },
+  absent: { key: "absent", label: "Absent", short: "A", color: "#334155" },
+  leave: { key: "leave", label: "Leave", short: "L", color: "#b45309" },
+  half: { key: "half", label: "Half Day", short: "H", color: "#64748b" },
 };
 const STATUS_CYCLE = ["present", "absent", "leave", "half", null];
 
@@ -65,8 +64,6 @@ function safeSheetName(name, usedNames) {
 
 export default function AttendanceTracker() {
   const [loading, setLoading] = useState(true);
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [dbConnected, setDbConnected] = useState(true);
   const [saveError, setSaveError] = useState(false);
   const [saveErrorMessage, setSaveErrorMessage] = useState("");
   const [employees, setEmployees] = useState([]);
@@ -82,7 +79,6 @@ export default function AttendanceTracker() {
 
   const fetchData = useCallback(async (isInitial = false) => {
     if (isInitial) setLoading(true);
-    else setIsSyncing(true);
 
     try {
       const res = await fetch("/api/all-data");
@@ -92,7 +88,6 @@ export default function AttendanceTracker() {
       if (data.success) {
         setEmployees(data.employees || []);
         setAttendance(data.attendance || {});
-        setDbConnected(true);
         
         try {
           localStorage.setItem("adm-employees", JSON.stringify(data.employees || []));
@@ -102,9 +97,6 @@ export default function AttendanceTracker() {
         throw new Error(data.error || "Failed to fetch");
       }
     } catch (err) {
-      console.warn("Sync error, fallback to local cache:", err.message);
-      setDbConnected(false);
-      
       if (isInitial) {
         try {
           const empRaw = localStorage.getItem("adm-employees");
@@ -115,7 +107,6 @@ export default function AttendanceTracker() {
       }
     } finally {
       if (isInitial) setLoading(false);
-      setIsSyncing(false);
     }
   }, []);
 
@@ -150,7 +141,7 @@ export default function AttendanceTracker() {
       fetchData(false);
     } catch (e) {
       setSaveError(true);
-      setSaveErrorMessage("Failed to save employee to database.");
+      setSaveErrorMessage("Failed to save employee.");
     }
   };
 
@@ -358,8 +349,8 @@ export default function AttendanceTracker() {
   if (loading) {
     return (
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100vh" }}>
-        <Loader2 size={24} style={{ animation: "spin 1s linear infinite", marginBottom: 10, color: "#0f172a" }} />
-        <span style={{ fontSize: 14, color: "#64748b" }}>Loading register...</span>
+        <Loader2 size={24} style={{ animation: "spin 1s linear infinite", marginBottom: 12, color: "#0f172a" }} />
+        <span style={{ fontSize: 14, color: "#64748b", fontWeight: 500 }}>Loading register...</span>
       </div>
     );
   }
@@ -373,48 +364,33 @@ export default function AttendanceTracker() {
           <div className="header-top">
             <div className="header-title-group">
               <h1>Attendance Register</h1>
-              <p>{employees.length} {employees.length === 1 ? "employee" : "employees"}</p>
-            </div>
-
-            <div className="sync-badge">
-              <span className={`status-dot ${dbConnected ? "" : "offline"}`} />
-              <span>{dbConnected ? "Connected" : "Offline"}</span>
-              {isSyncing ? (
-                <RefreshCw size={11} style={{ animation: "spin 1s linear infinite", marginLeft: 4 }} />
-              ) : (
-                <button 
-                  onClick={() => fetchData(false)} 
-                  style={{ background: "none", border: "none", cursor: "pointer", padding: 0, marginLeft: 4, display: "flex", color: "#64748b" }}
-                >
-                  <RefreshCw size={11} />
-                </button>
-              )}
+              <p>{employees.length} {employees.length === 1 ? "employee" : "employees"} registered</p>
             </div>
           </div>
 
           {/* Navigation Tabs */}
           <div className="nav-tabs">
             <button className={`nav-tab ${tab === "today" ? "active" : ""}`} onClick={() => setTab("today")}>
-              <CalendarDays size={15} /> Mark Attendance
+              <CalendarDays size={16} /> Mark Attendance
             </button>
             <button className={`nav-tab ${tab === "register" ? "active" : ""}`} onClick={() => setTab("register")}>
-              <BookOpen size={15} /> Monthly Register
+              <BookOpen size={16} /> Monthly Register
             </button>
             <button className={`nav-tab ${tab === "employees" ? "active" : ""}`} onClick={() => setTab("employees")}>
-              <Users size={15} /> Employees
+              <Users size={16} /> Employees
             </button>
           </div>
         </div>
 
         {/* Body Content */}
-        <div className="app-body">
+        <div className="app-body" key={tab}>
           {saveError && (
-            <div style={{ background: "#fef2f2", border: "1px solid #fca5a5", color: "#991b1b", padding: "10px 14px", borderRadius: 6, marginBottom: 16, fontSize: 13, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div style={{ background: "#f8fafc", border: "1px solid #cbd5e1", color: "#334155", padding: "12px 16px", borderRadius: 12, marginBottom: 20, fontSize: 13, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <AlertCircle size={15} />
+                <AlertCircle size={16} />
                 <span>{saveErrorMessage}</span>
               </div>
-              <button onClick={() => setSaveError(false)} style={{ background: "none", border: "none", cursor: "pointer", fontWeight: "bold", color: "#991b1b" }}>✕</button>
+              <button onClick={() => setSaveError(false)} style={{ background: "none", border: "none", cursor: "pointer", fontWeight: "bold", color: "#334155" }}>✕</button>
             </div>
           )}
 
@@ -424,13 +400,13 @@ export default function AttendanceTracker() {
               <div className="date-nav">
                 <div className="date-controls">
                   <button className="btn-icon" onClick={() => setSelectedDate(new Date(selectedDate.getTime() - 86400000))}>
-                    <ChevronLeft size={16} />
+                    <ChevronLeft size={18} />
                   </button>
                   <span className="date-heading">
                     {selectedDate.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })}
                   </span>
                   <button className="btn-icon" onClick={() => setSelectedDate(new Date(selectedDate.getTime() + 86400000))}>
-                    <ChevronRight size={16} />
+                    <ChevronRight size={18} />
                   </button>
                 </div>
 
@@ -440,8 +416,8 @@ export default function AttendanceTracker() {
               </div>
 
               {employees.length === 0 ? (
-                <div style={{ textAlign: "center", padding: "40px 0", color: "#64748b", fontSize: 14 }}>
-                  No employees found. Add employees in the Employees tab.
+                <div style={{ textAlign: "center", padding: "48px 0", color: "#64748b", fontSize: 14 }}>
+                  No employees registered. Add employees in the Employees tab.
                 </div>
               ) : (
                 employees.map((emp) => {
@@ -497,23 +473,23 @@ export default function AttendanceTracker() {
               <div className="date-nav">
                 <div className="date-controls">
                   <button className="btn-icon" onClick={() => setRegisterMonth(new Date(registerMonth.getFullYear(), registerMonth.getMonth() - 1, 1))}>
-                    <ChevronLeft size={16} />
+                    <ChevronLeft size={18} />
                   </button>
                   <span className="date-heading">{monthLabel(registerMonth)}</span>
                   <button className="btn-icon" onClick={() => setRegisterMonth(new Date(registerMonth.getFullYear(), registerMonth.getMonth() + 1, 1))}>
-                    <ChevronRight size={16} />
+                    <ChevronRight size={18} />
                   </button>
                 </div>
               </div>
 
               <div className="export-actions">
                 <button className="btn-secondary" onClick={exportMonthlyRegister} disabled={employees.length === 0}>
-                  <Download size={14} /> Export Register (Excel)
+                  <Download size={15} /> Export Register (Excel)
                 </button>
                 <button className="btn-secondary" onClick={exportClientWiseReport} disabled={employees.length === 0}>
-                  <Building2 size={14} /> Export Client Report (Excel)
+                  <Building2 size={15} /> Export Client Report (Excel)
                 </button>
-                {exportNote && <span style={{ fontSize: 12, color: "#166534", alignSelf: "center" }}>{exportNote}</span>}
+                {exportNote && <span style={{ fontSize: 12, color: "#0f766e", fontWeight: 600, alignSelf: "center" }}>{exportNote}</span>}
               </div>
 
               <div className="legend-bar">
@@ -526,8 +502,8 @@ export default function AttendanceTracker() {
               </div>
 
               {employees.length === 0 ? (
-                <div style={{ textAlign: "center", padding: "40px 0", color: "#64748b", fontSize: 14 }}>
-                  No employees found.
+                <div style={{ textAlign: "center", padding: "48px 0", color: "#64748b", fontSize: 14 }}>
+                  No employees registered.
                 </div>
               ) : (
                 <div className="table-scroll-container">
@@ -589,18 +565,18 @@ export default function AttendanceTracker() {
                 />
                 <input
                   className="text-input"
-                  placeholder="Role (e.g. Associate)"
+                  placeholder="Role (e.g. Audit Associate)"
                   value={newEmpRole}
                   onChange={(e) => setNewEmpRole(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && addEmployee()}
                 />
                 <button className="btn-primary" onClick={addEmployee}>
-                  <Plus size={15} /> Add Employee
+                  <Plus size={16} /> Add Employee
                 </button>
               </div>
 
               {employees.length === 0 ? (
-                <div style={{ textAlign: "center", padding: "30px 0", color: "#64748b", fontSize: 14 }}>
+                <div style={{ textAlign: "center", padding: "36px 0", color: "#64748b", fontSize: 14 }}>
                   No employees yet. Add your first employee above.
                 </div>
               ) : (
@@ -610,23 +586,23 @@ export default function AttendanceTracker() {
                       <div className="emp-info-name">{emp.name}</div>
                       <div className="emp-info-role">{emp.role}</div>
                     </div>
-                    <button className="btn-danger" onClick={() => removeEmployee(emp.id)}>
+                    <button className="btn-neutral-remove" onClick={() => removeEmployee(emp.id)}>
                       <Trash2 size={14} /> Remove
                     </button>
                   </div>
                 ))
               )}
 
-              <div style={{ marginTop: 32, paddingTop: 20, borderTop: "1px solid #e2e8f0" }}>
+              <div style={{ marginTop: 36, paddingTop: 24, borderTop: "1px solid #e2e8f0" }}>
                 {!confirmClear ? (
-                  <button className="btn-danger" onClick={() => setConfirmClear(true)}>
+                  <button className="btn-neutral-remove" onClick={() => setConfirmClear(true)}>
                     <Trash2 size={14} /> Clear all data
                   </button>
                 ) : (
-                  <div style={{ fontSize: 13, color: "#991b1b" }}>
-                    This permanently deletes all employees and attendance logs from Supabase.
-                    <div style={{ marginTop: 10, display: "flex", gap: 10 }}>
-                      <button className="btn-danger" onClick={clearAllData}>Confirm Clear</button>
+                  <div style={{ fontSize: 13, color: "#334155" }}>
+                    This permanently removes all employees and attendance logs.
+                    <div style={{ marginTop: 12, display: "flex", gap: 10 }}>
+                      <button className="btn-neutral-remove" style={{ background: "#334155", color: "#fff", borderColor: "#334155" }} onClick={clearAllData}>Confirm Clear</button>
                       <button className="btn-secondary" onClick={() => setConfirmClear(false)}>Cancel</button>
                     </div>
                   </div>
