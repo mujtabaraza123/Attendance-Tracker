@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { Check, X, Clock, Minus, Plus, Trash2, ChevronLeft, ChevronRight, Users, CalendarDays, BookOpen, Loader2, Download, Building2 } from "lucide-react";
+import { Check, X, Clock, Minus, Plus, Trash2, ChevronLeft, ChevronRight, Users, CalendarDays, BookOpen, Loader2, Download, Building2, CloudCheck, RefreshCw, AlertCircle } from "lucide-react";
 import * as XLSX from "xlsx";
 
 const STATUS = {
@@ -23,8 +23,6 @@ function uid() {
   return Math.random().toString(36).slice(2, 10);
 }
 
-// Sites that represent the office/HQ rather than a client premises.
-// Anything else typed into the "site" field is treated as a client name.
 const OFFICE_ALIASES = new Set(["office", "hq", "head office", "main office", ""]);
 
 function isClientSite(site) {
@@ -32,7 +30,6 @@ function isClientSite(site) {
   return !OFFICE_ALIASES.has(site.trim().toLowerCase());
 }
 
-// Excel sheet names: max 31 chars, no \ / ? * [ ]
 function safeSheetName(name, usedNames) {
   let base = String(name).replace(/[\\/?*[\]]/g, "-").slice(0, 31).trim() || "Sheet";
   let candidate = base;
@@ -48,7 +45,10 @@ function safeSheetName(name, usedNames) {
 
 export default function AttendanceTracker() {
   const [loading, setLoading] = useState(true);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [dbConnected, setDbConnected] = useState(true);
   const [saveError, setSaveError] = useState(false);
+  const [saveErrorMessage, setSaveErrorMessage] = useState("");
   const [employees, setEmployees] = useState([]);
   const [attendance, setAttendance] = useState({}); // key: empId__YYYY-MM-DD -> {status, site}
   const [tab, setTab] = useState("today");
@@ -59,64 +59,153 @@ export default function AttendanceTracker() {
   const [siteDrafts, setSiteDrafts] = useState({});
   const [confirmClear, setConfirmClear] = useState(false);
   const [exportNote, setExportNote] = useState("");
+  const [lastSynced, setLastSynced] = useState(null);
 
-  useEffect(() => {
+  // Fetch data from Supabase backend API
+  const fetchData = useCallback(async (isInitial = false) => {
+    if (isInitial) setLoading(true);
+    else setIsSyncing(true);
+
     try {
-      const empRaw = localStorage.getItem("adm-employees");
-      const attRaw = localStorage.getItem("adm-attendance");
-      if (empRaw) setEmployees(JSON.parse(empRaw));
-      if (attRaw) setAttendance(JSON.parse(attRaw));
-    } catch (e) {
-      console.error("Load error:", e);
+      const res = await fetch("/api/all-data");
+      if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+      const data = await res.json();
+      
+      if (data.success) {
+        setEmployees(data.employees || []);
+        setAttendance(data.attendance || {});
+        setDbConnected(true);
+        setLastSynced(new Date());
+        
+        // Cache locally as backup
+        try {
+          localStorage.setItem("adm-employees", JSON.stringify(data.employees || []));
+          localStorage.setItem("adm-attendance", JSON.stringify(data.attendance || {}));
+        } catch (e) {}
+      } else {
+        throw new Error(data.error || "Failed to fetch");
+      }
+    } catch (err) {
+      console.warn("Cloud sync error (using local cache fallback):", err.message);
+      setDbConnected(false);
+      
+      // Fallback to local storage if network request fails
+      if (isInitial) {
+        try {
+          const empRaw = localStorage.getItem("adm-employees");
+          const attRaw = localStorage.getItem("adm-attendance");
+          if (empRaw) setEmployees(JSON.parse(empRaw));
+          if (attRaw) setAttendance(JSON.parse(attRaw));
+        } catch (e) {}
+      }
     } finally {
-      setLoading(false);
+      if (isInitial) setLoading(false);
+      setIsSyncing(false);
     }
   }, []);
 
-  const persistEmployees = useCallback((list) => {
-    try {
-      localStorage.setItem("adm-employees", JSON.stringify(list));
-    } catch (e) {
-      console.error("Save error:", e);
-      setSaveError(true);
-    }
-  }, []);
+  // Initial load and periodic polling every 3 seconds for multi-user sync
+  useEffect(() => {
+    fetchData(true);
 
-  const persistAttendance = useCallback((map) => {
-    try {
-      localStorage.setItem("adm-attendance", JSON.stringify(map));
-    } catch (e) {
-      console.error("Save error:", e);
-      setSaveError(true);
-    }
-  }, []);
+    const interval = setInterval(() => {
+      fetchData(false);
+    }, 3000);
 
-  const addEmployee = () => {
+    const handleFocus = () => {
+      fetchData(false);
+    };
+    window.addEventListener("focus", handleFocus);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", handleFocus);
+    };
+  }, [fetchData]);
+
+  // Add Employee
+  const addEmployee = async () => {
     const name = newEmpName.trim();
     if (!name) return;
-    const next = [...employees, { id: uid(), name, role: newEmpRole.trim() || "Staff" }];
-    setEmployees(next);
-    persistEmployees(next);
+    const newEmp = { id: uid(), name, role: newEmpRole.trim() || "Staff" };
+    
+    // Optimistic UI update
+    const nextEmps = [...employees, newEmp];
+    setEmployees(nextEmps);
     setNewEmpName("");
     setNewEmpRole("");
-  };
 
-  const removeEmployee = (id) => {
-    const next = employees.filter((e) => e.id !== id);
-    setEmployees(next);
-    persistEmployees(next);
-  };
-
-  const setStatus = (empId, dateStr, status, site) => {
-    const key = `${empId}__${dateStr}`;
-    const next = { ...attendance };
-    if (status === null) {
-      delete next[key];
-    } else {
-      next[key] = { status, site: site || next[key]?.site || "" };
+    try {
+      const res = await fetch("/api/employees", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newEmp)
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error);
+      fetchData(false);
+    } catch (e) {
+      console.error("Save employee error:", e);
+      setSaveError(true);
+      setSaveErrorMessage("Failed to save employee to Supabase cloud database.");
     }
-    setAttendance(next);
-    persistAttendance(next);
+  };
+
+  // Remove Employee
+  const removeEmployee = async (id) => {
+    // Optimistic UI update
+    const nextEmps = employees.filter((e) => e.id !== id);
+    setEmployees(nextEmps);
+
+    try {
+      const res = await fetch(`/api/employees/${id}`, {
+        method: "DELETE"
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error);
+      fetchData(false);
+    } catch (e) {
+      console.error("Remove employee error:", e);
+      setSaveError(true);
+      setSaveErrorMessage("Failed to remove employee from Supabase database.");
+    }
+  };
+
+  // Set Attendance Status
+  const setStatus = async (empId, dateStr, status, site) => {
+    const key = `${empId}__${dateStr}`;
+    const nextAtt = { ...attendance };
+    const currentSite = site !== undefined ? site : (nextAtt[key]?.site || "");
+
+    if (status === null) {
+      delete nextAtt[key];
+    } else {
+      nextAtt[key] = { status, site: currentSite };
+    }
+
+    // Optimistic UI update
+    setAttendance(nextAtt);
+
+    try {
+      const res = await fetch("/api/attendance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: key,
+          empId,
+          dateStr,
+          status,
+          site: currentSite
+        })
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error);
+      fetchData(false);
+    } catch (e) {
+      console.error("Save attendance error:", e);
+      setSaveError(true);
+      setSaveErrorMessage("Failed to sync attendance to Supabase database.");
+    }
   };
 
   const cycleStatus = (empId, dateStr) => {
@@ -127,12 +216,21 @@ export default function AttendanceTracker() {
     setStatus(empId, dateStr, nextStatus);
   };
 
-  const clearAllData = () => {
+  const clearAllData = async () => {
     setEmployees([]);
     setAttendance({});
-    persistEmployees([]);
-    persistAttendance({});
     setConfirmClear(false);
+
+    try {
+      const res = await fetch("/api/clear-all", { method: "POST" });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error);
+      fetchData(false);
+    } catch (e) {
+      console.error("Clear data error:", e);
+      setSaveError(true);
+      setSaveErrorMessage("Failed to clear cloud database.");
+    }
   };
 
   const selectedDateStr = fmtDate(selectedDate);
@@ -190,7 +288,6 @@ export default function AttendanceTracker() {
     ws["!cols"] = [{ wch: 22 }, { wch: 16 }, ...monthDays.map(() => ({ wch: 4 })), { wch: 10 }];
     ws["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: header.length - 1 } }];
 
-    // Legend sheet
     const legendData = [
       ["Code", "Meaning"],
       ...Object.values(STATUS).map((s) => [s.short, s.label]),
@@ -214,7 +311,6 @@ export default function AttendanceTracker() {
     const m = registerMonth.getMonth();
     const monthName = monthLabel(registerMonth);
 
-    // Build { clientName: [ {date, employee, role} ] }
     const byClient = {};
     employees.forEach((emp) => {
       monthDays.forEach((day) => {
@@ -239,7 +335,6 @@ export default function AttendanceTracker() {
     const wb = XLSX.utils.book_new();
     const usedNames = new Set();
 
-    // Summary sheet: client vs total attendance-days + unique employees
     const summaryRows = clientNames.map((c) => {
       const entries = byClient[c];
       const uniqueEmps = new Set(entries.map((e) => e.employee));
@@ -255,7 +350,6 @@ export default function AttendanceTracker() {
     wsSummary["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 2 } }];
     XLSX.utils.book_append_sheet(wb, wsSummary, safeSheetName("Summary", usedNames));
 
-    // One sheet per client
     clientNames.forEach((client) => {
       const entries = byClient[client].sort((a, b) => a.date.localeCompare(b.date) || a.employee.localeCompare(b.employee));
       const wsData = [
@@ -278,9 +372,10 @@ export default function AttendanceTracker() {
 
   if (loading) {
     return (
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 320, color: "#6B6456", fontFamily: "Inter, sans-serif" }}>
-        <Loader2 size={18} style={{ marginRight: 8, animation: "spin 1s linear infinite" }} />
-        Opening the register…
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: 360, color: "#1B3A32", fontFamily: "Inter, sans-serif" }}>
+        <Loader2 size={24} style={{ marginBottom: 12, animation: "spin 1s linear infinite", color: "#A9823B" }} />
+        <div style={{ fontWeight: 600, fontSize: 15 }}>Connecting to Supabase Cloud Database…</div>
+        <div style={{ fontSize: 12, color: "#8A8371", marginTop: 4 }}>Synchronizing live attendance register</div>
       </div>
     );
   }
@@ -289,12 +384,16 @@ export default function AttendanceTracker() {
     <div className="adm-root">
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Roboto+Slab:wght@500;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
-        .adm-root { font-family: 'Inter', sans-serif; color: #26231F; background: #FAF7EF; border-radius: 10px; overflow: hidden; border: 1px solid #E4DCC4; max-width: 900px; margin: 0 auto; }
+        .adm-root { font-family: 'Inter', sans-serif; color: #26231F; background: #FAF7EF; border-radius: 10px; overflow: hidden; border: 1px solid #E4DCC4; max-width: 920px; margin: 0 auto; }
         @keyframes spin { to { transform: rotate(360deg); } }
-        .adm-header { background: #1B3A32; color: #F3EFDF; padding: 20px 24px 0 24px; }
-        .adm-title-row { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+        .adm-header { background: #1B3A32; color: #F3EFDF; padding: 20px 24px 0 24px; position: relative; }
+        .adm-header-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; flex-wrap: wrap; gap: 10px; }
+        .adm-title-row { display: flex; align-items: center; gap: 10px; }
         .adm-title { font-family: 'Roboto Slab', serif; font-weight: 700; font-size: 20px; letter-spacing: 0.2px; }
         .adm-subtitle { font-size: 12px; color: #B7C9C1; margin-top: 2px; font-family: 'IBM Plex Mono', monospace; }
+        .adm-badge { display: flex; align-items: center; gap: 6px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); padding: 4px 10px; border-radius: 20px; font-size: 11px; font-family: 'IBM Plex Mono', monospace; color: #E8F5E9; }
+        .pulse-dot { width: 8px; height: 8px; border-radius: 50%; background: #4CAF50; box-shadow: 0 0 8px #4CAF50; display: inline-block; }
+        .pulse-dot.warning { background: #FFC107; box-shadow: 0 0 8px #FFC107; }
         .adm-tabs { display: flex; gap: 4px; }
         .adm-tab { display: flex; align-items: center; gap: 6px; padding: 9px 16px; font-size: 13px; font-weight: 500; color: #C7D6CF; background: transparent; border: none; border-bottom: 2px solid transparent; cursor: pointer; font-family: 'Inter', sans-serif; }
         .adm-tab.active { color: #F3EFDF; border-bottom: 2px solid #A9823B; }
@@ -338,13 +437,31 @@ export default function AttendanceTracker() {
       `}</style>
 
       <div className="adm-header">
-        <div className="adm-title-row">
-          <BookOpen size={20} color="#A9823B" />
-          <div>
-            <div className="adm-title">Attendance Register</div>
-            <div className="adm-subtitle">{employees.length} {employees.length === 1 ? "employee" : "employees"} on file</div>
+        <div className="adm-header-top">
+          <div className="adm-title-row">
+            <BookOpen size={20} color="#A9823B" />
+            <div>
+              <div className="adm-title">Attendance Register</div>
+              <div className="adm-subtitle">{employees.length} {employees.length === 1 ? "employee" : "employees"} on file</div>
+            </div>
+          </div>
+          <div className="adm-badge" title="All users are connected live to the same Supabase database">
+            <span className={`pulse-dot ${dbConnected ? "" : "warning"}`} />
+            <span>{dbConnected ? "Supabase Cloud Shared" : "Offline Cache"}</span>
+            {isSyncing ? (
+              <RefreshCw size={11} style={{ animation: "spin 1s linear infinite", marginLeft: 4 }} />
+            ) : (
+              <button 
+                onClick={() => fetchData(false)} 
+                title="Sync now" 
+                style={{ background: "none", border: "none", color: "inherit", cursor: "pointer", padding: 0, marginLeft: 4, display: "flex" }}
+              >
+                <RefreshCw size={11} />
+              </button>
+            )}
           </div>
         </div>
+
         <div className="adm-tabs">
           <button className={`adm-tab ${tab === "today" ? "active" : ""}`} onClick={() => setTab("today")}>
             <CalendarDays size={14} /> Mark Attendance
@@ -360,8 +477,12 @@ export default function AttendanceTracker() {
 
       <div className="adm-body">
         {saveError && (
-          <div style={{ background: "#FBF0F0", border: "1px solid #E9C6C6", color: "#A13D3D", fontSize: 12, padding: "8px 12px", borderRadius: 6, marginBottom: 14 }}>
-            Couldn't save the last change. Your data may not persist — try again.
+          <div style={{ background: "#FBF0F0", border: "1px solid #E9C6C6", color: "#A13D3D", fontSize: 12, padding: "8px 12px", borderRadius: 6, marginBottom: 14, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <AlertCircle size={14} />
+              <span>{saveErrorMessage || "Couldn't save to database. Check network connection."}</span>
+            </div>
+            <button onClick={() => setSaveError(false)} style={{ background: "none", border: "none", color: "#A13D3D", cursor: "pointer", fontWeight: "bold" }}>✕</button>
           </div>
         )}
 
@@ -555,7 +676,7 @@ export default function AttendanceTracker() {
                 </button>
               ) : (
                 <div style={{ fontSize: 12, color: "#A13D3D" }}>
-                  This removes every employee and attendance record. This can't be undone.
+                  This removes every employee and attendance record from Supabase Cloud. This can't be undone.
                   <div style={{ marginTop: 8, display: "flex", gap: 8 }}>
                     <button className="adm-btn-danger" onClick={clearAllData}>Yes, clear everything</button>
                     <button className="adm-date-btn" style={{ width: "auto", padding: "0 14px" }} onClick={() => setConfirmClear(false)}>Cancel</button>
