@@ -559,7 +559,7 @@ export default function App() {
                 />
               </div>
               <button className="auth-submit" type="submit" disabled={authLoading || otp.replace(/\D/g,"").length < 6}>
-                {authLoading ? <Loader2 size={14} className="spin"/> : "Verify & Continue"}
+                {authLoading ? <Loader2 size={14} className="spin"/> : "Verify"}
               </button>
               <div className="verify-actions">
                 <button type="button" className="link-btn" onClick={()=>{setAuthStep("form");setOtp("");setAuthError("");}}>Back</button>
@@ -627,12 +627,12 @@ export default function App() {
                   <div style={{width:`${(todayStats.leave/(todayStats.total||1))*100}%`,background:"#92400e"}}/>
                   <div style={{width:`${(todayStats.half/(todayStats.total||1))*100}%`,background:"#4f46e5"}}/>
                 </div>
-                <div className="stat-nums">
-                  <span style={{color:"#16a34a"}}>{todayStats.present} P</span>
-                  <span style={{color:"#1e293b"}}>{todayStats.absent} A</span>
-                  <span style={{color:"#92400e"}}>{todayStats.leave} L</span>
-                  <span style={{color:"#4f46e5"}}>{todayStats.half} H</span>
-                  <span className="ml-auto">{todayStats.pct}% marked</span>
+                <div className="stat-pills-row">
+                  <span className="spill green"><span className="spill-count">{todayStats.present}</span> Present</span>
+                  <span className="spill dark"><span className="spill-count">{todayStats.absent}</span> Absent</span>
+                  <span className="spill amber"><span className="spill-count">{todayStats.leave}</span> Leave</span>
+                  <span className="spill indigo"><span className="spill-count">{todayStats.half}</span> Half Day</span>
+                  <span className="spill marked ml-auto"><span className="spill-count">{todayStats.pct}%</span> Marked</span>
                 </div>
                 <div className="row-between">
                   <button className="sm-btn green" onClick={markAllPresent}><CheckCheck size={12}/> Mark All Present</button>
@@ -702,7 +702,7 @@ export default function App() {
 
         {/* REGISTER */}
         {tab==="register" && (
-          <>
+          <div className="register-view">
             <div className="row-between mb-12">
               <div className="date-nav">
                 <button className="icon-btn" onClick={()=>setRegMonth(new Date(regMonth.getFullYear(),regMonth.getMonth()-1,1))}><ChevronLeft size={15}/></button>
@@ -761,7 +761,7 @@ export default function App() {
                 </table>
               </div>
             )}
-          </>
+          </div>
         )}
 
         {/* EMPLOYEES */}

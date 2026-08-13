@@ -258,11 +258,22 @@ input, button { font-family: inherit; }
   border-radius: 10px; overflow: hidden; display: flex;
 }
 .stat-bar > div { height: 100%; }
-.stat-nums {
-  display: flex; gap: 12px; font-size: 12px; font-weight: 700;
-  flex-wrap: wrap;
+/* Stat pills row */
+.stat-pills-row {
+  display: flex; gap: 6px; flex-wrap: wrap; align-items: center;
 }
-.stat-nums span { white-space: nowrap; }
+.spill {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 4px 10px; border-radius: 100px;
+  border: 1px solid var(--bd); background: var(--bg);
+  font-size: 11px; font-weight: 600; color: var(--m);
+}
+.spill-count { font-weight: 800; font-size: 12px; }
+.spill.green  { color: #16a34a; border-color: #bbf7d0; background: #f0fdf4; }
+.spill.dark   { color: #1e293b; border-color: #cbd5e1; background: #f8fafc; }
+.spill.amber  { color: #92400e; border-color: #fde68a; background: #fffbeb; }
+.spill.indigo { color: #4f46e5; border-color: #c7d2fe; background: #eef2ff; }
+.spill.marked { color: var(--c);  border-color: var(--bd);   background: var(--wh); }
 
 /* Filter pills */
 .filter-row { display: flex; gap: 4px; flex-wrap: wrap; }
@@ -322,12 +333,21 @@ input, button { font-family: inherit; }
 .empty { padding: 40px 20px; text-align: center; font-size: 13px; color: var(--m); }
 
 /* ── Register table ─────────────────────────────────────── */
+.register-view {
+  display: flex; flex-direction: column; flex: 1;
+  min-height: calc(100vh - 170px);
+}
 .legend { display: flex; gap: 12px; flex-wrap: wrap; }
 .leg-item { font-size: 11px; font-weight: 600; color: var(--m); display: flex; align-items: center; gap: 4px; }
 .leg-dot { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
 .export-ok { font-size: 12px; font-weight: 700; color: #16a34a; }
 
-.table-wrap { overflow-x: auto; border: 1px solid var(--bd); border-radius: var(--r); background: var(--wh); }
+.table-wrap {
+  flex: 1; overflow: auto;
+  border: 1px solid var(--bd); border-radius: var(--r);
+  background: var(--wh);
+  max-height: calc(100vh - 240px);
+}
 .reg-tbl { width: 100%; border-collapse: collapse; font-size: 11px; }
 .reg-tbl th, .reg-tbl td {
   padding: 6px 4px; text-align: center;
