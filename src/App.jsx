@@ -452,11 +452,11 @@ export default function App() {
                 <input className="finput" type="email" placeholder="you@firm.com" value={loginEmail} onChange={e=>setLoginEmail(e.target.value)} onFocus={handleInputFocus} required />
               </div>
               <div className="fld">
-                <div className="row-between">
-                  <label>Password</label>
+                <label>Password</label>
+                <input className="finput" type="password" placeholder="Enter your password" value={loginPassword} onChange={e=>setLoginPassword(e.target.value)} onFocus={handleInputFocus} required />
+                <div style={{textAlign:"right",marginTop:2}}>
                   <button type="button" className="link-btn" style={{fontSize:11}} onClick={()=>switchTab("forgot")}>Forgot password?</button>
                 </div>
-                <input className="finput" type="password" placeholder="Enter your password" value={loginPassword} onChange={e=>setLoginPassword(e.target.value)} onFocus={handleInputFocus} required />
               </div>
               <button className="auth-submit" type="submit" disabled={authLoading}>
                 {authLoading ? <Loader2 size={14} className="spin"/> : "Login"}
