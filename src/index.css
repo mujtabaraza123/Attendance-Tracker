@@ -1,4 +1,4 @@
-/* Clean minimal CSS reset and responsive layout setup */
+/* Clean minimal CSS reset and Bubble font setup */
 *, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
@@ -10,7 +10,7 @@ html, body {
   min-height: 100vh;
   background-color: #f8fafc;
   color: #0f172a;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-family: 'Bubblegum Sans', 'Fredoka', cursive, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }

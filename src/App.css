@@ -1,4 +1,4 @@
-/* Full-Page Modern App Layout — Mobile & Desktop Native Experience */
+/* Full-Page Modern App Layout with Bubble Font */
 
 :root {
   --bg-main: #f8fafc;
@@ -22,6 +22,10 @@
   --status-half-bg: #f1f5f9;
 }
 
+body, html, input, button, select, textarea, table {
+  font-family: 'Bubblegum Sans', 'Fredoka', cursive, sans-serif !important;
+}
+
 body, html {
   width: 100%;
   min-height: 100vh;
@@ -29,7 +33,6 @@ body, html {
   padding: 0;
   background-color: var(--bg-main);
   color: var(--text-main);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -65,8 +68,8 @@ body, html {
 }
 
 .header-logo-circle {
-  width: 36px;
-  height: 36px;
+  width: 38px;
+  height: 38px;
   border-radius: 50%;
   object-fit: cover;
   border: 2px solid #e2e8f0;
@@ -74,11 +77,20 @@ body, html {
 }
 
 .header-brand h1 {
-  font-size: 20px;
+  font-size: 22px;
   font-weight: 800;
   color: var(--charcoal);
-  letter-spacing: -0.4px;
+  letter-spacing: 0.2px;
   margin: 0;
+}
+
+.emp-counter-badge {
+  background: #f1f5f9;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: 20px;
 }
 
 .user-session-badge {
@@ -86,9 +98,9 @@ body, html {
   align-items: center;
   gap: 8px;
   background: #f1f5f9;
-  padding: 4px 10px;
+  padding: 4px 12px;
   border-radius: 20px;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--charcoal);
   border: 1px solid var(--border-color);
@@ -98,7 +110,7 @@ body, html {
   background: transparent;
   border: none;
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   cursor: pointer;
   padding: 2px 6px;
@@ -116,7 +128,7 @@ body, html {
   gap: 6px;
   background: #f1f5f9;
   padding: 4px;
-  border-radius: 12px;
+  border-radius: 14px;
   margin-bottom: 12px;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
@@ -129,12 +141,12 @@ body, html {
   justify-content: center;
   gap: 8px;
   padding: 10px 14px;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--text-muted);
   background: transparent;
   border: none;
-  border-radius: 8px;
+  border-radius: 10px;
   cursor: pointer;
   white-space: nowrap;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
@@ -180,8 +192,8 @@ body, html {
 }
 
 .login-logo {
-  width: 64px;
-  height: 64px;
+  width: 68px;
+  height: 68px;
   border-radius: 50%;
   object-fit: cover;
   margin: 0 auto 14px auto;
@@ -190,14 +202,14 @@ body, html {
 }
 
 .login-title {
-  font-size: 22px;
+  font-size: 24px;
   font-weight: 800;
   color: var(--charcoal);
   margin-bottom: 6px;
 }
 
 .login-subtitle {
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text-muted);
   margin-bottom: 24px;
 }
@@ -211,7 +223,7 @@ body, html {
 }
 
 .form-label {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
   color: var(--text-main);
   text-transform: uppercase;
@@ -232,7 +244,7 @@ body, html {
   border: 1px solid var(--border-color);
   background: #ffffff;
   color: var(--text-main);
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.15s ease;
@@ -256,7 +268,7 @@ body, html {
   padding: 12px 16px;
   border: 1px solid var(--border-color);
   border-radius: 14px;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 500;
   outline: none;
   background: #ffffff;
@@ -281,7 +293,7 @@ body, html {
   border: none;
   padding: 14px;
   border-radius: 14px;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 700;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -315,20 +327,20 @@ body, html {
 }
 
 .meter-title {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 700;
   color: var(--text-main);
 }
 
 .meter-stat {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
   color: var(--status-present);
 }
 
 .progress-bar-bg {
   width: 100%;
-  height: 8px;
+  height: 9px;
   background: #f1f5f9;
   border-radius: 10px;
   overflow: hidden;
@@ -360,7 +372,7 @@ body, html {
   border: 1px solid #99f6e4;
   padding: 8px 14px;
   border-radius: 10px;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
   cursor: pointer;
   transition: all 0.15s ease;
@@ -411,7 +423,7 @@ body, html {
 .icon-btn:active { transform: scale(0.94); }
 
 .date-text {
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 700;
   color: var(--text-main);
 }
@@ -422,7 +434,7 @@ body, html {
   color: var(--text-main);
   padding: 8px 14px;
   border-radius: 10px;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   cursor: pointer;
 }
@@ -454,27 +466,27 @@ body, html {
 }
 
 .emp-avatar {
-  width: 40px;
-  height: 40px;
+  width: 42px;
+  height: 42px;
   border-radius: 50%;
   background: #0f172a;
   color: #ffffff;
   font-weight: 800;
-  font-size: 15px;
+  font-size: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .emp-name-text {
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 700;
   color: var(--text-main);
 }
 
 .emp-role-badge {
   display: inline-block;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   background: #f1f5f9;
   color: var(--text-muted);
@@ -500,7 +512,7 @@ body, html {
   border-radius: 10px;
   border: 1px solid var(--border-color);
   background: #ffffff;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
   color: var(--text-muted);
   cursor: pointer;
@@ -537,7 +549,7 @@ body, html {
   padding: 8px 10px;
   border: 1px solid var(--border-color);
   border-radius: 8px;
-  font-size: 13px;
+  font-size: 14px;
   outline: none;
   background: #ffffff;
   box-sizing: border-box;
@@ -550,7 +562,7 @@ body, html {
 }
 
 .site-pill {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   background: #ffffff;
   border: 1px solid var(--border-color);
@@ -576,7 +588,7 @@ body, html {
 }
 
 .add-emp-title {
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 800;
   color: var(--charcoal);
   margin-bottom: 14px;
@@ -598,7 +610,7 @@ body, html {
   border: none;
   padding: 12px 20px;
   border-radius: 12px;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 700;
   cursor: pointer;
   white-space: nowrap;
@@ -638,7 +650,7 @@ body, html {
 table.reg-grid {
   width: 100%;
   border-collapse: collapse;
-  font-size: 13px;
+  font-size: 14px;
 }
 
 table.reg-grid th, table.reg-grid td {
@@ -652,7 +664,7 @@ table.reg-grid th {
   background: #f8fafc;
   font-weight: 700;
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 table.reg-grid th.sticky-name, table.reg-grid td.sticky-name {
@@ -678,7 +690,7 @@ table.reg-grid th.sticky-name {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 800;
   cursor: pointer;
   border: 1px solid var(--border-color);
@@ -710,7 +722,7 @@ table.reg-grid th.sticky-name {
   border: 1px solid var(--border-color);
   padding: 10px 16px;
   border-radius: 10px;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--text-main);
   cursor: pointer;
