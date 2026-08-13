@@ -121,6 +121,29 @@ input, button, select, textarea { font-family: inherit; }
   animation: fadeIn 0.25s ease;
 }
 
+/* Mobile brand header (shown only on mobile) */
+.auth-mobile-header {
+  display: none;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 28px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--border);
+}
+.auth-mobile-logo {
+  width: 44px; height: 44px;
+  border-radius: 50%; object-fit: cover;
+  border: 2px solid var(--border);
+  flex-shrink: 0;
+}
+.auth-mobile-title {
+  font-size: 18px; font-weight: 800;
+  color: var(--charcoal); letter-spacing: -0.3px;
+}
+.auth-mobile-sub {
+  font-size: 12px; color: var(--muted); margin-top: 2px;
+}
+
 .auth-header { margin-bottom: 24px; }
 .auth-header h2 { font-size: 22px; font-weight: 800; color: var(--charcoal); margin-bottom: 6px; }
 .auth-header p { font-size: 13px; color: var(--muted); line-height: 1.5; }
@@ -508,16 +531,40 @@ input, button, select, textarea { font-family: inherit; }
 
 /* ── Mobile ───────────────────────────────────────────────── */
 @media (max-width: 680px) {
-  .auth-wrapper { grid-template-columns: 1fr; }
+  /* Auth layout — full-screen single column */
+  .auth-wrapper {
+    grid-template-columns: 1fr;
+    min-height: 100vh;
+  }
   .auth-left { display: none; }
-  .auth-right { padding: 24px 16px; align-items: flex-start; padding-top: 40px; }
-  .auth-card { padding: 24px 18px; }
+  .auth-right {
+    padding: 0;
+    align-items: stretch;
+    background: var(--white);
+    min-height: 100vh;
+  }
+  .auth-card {
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    padding: 32px 20px 48px;
+    min-height: 100vh;
+    max-width: 100%;
+    background: var(--white);
+  }
 
+  /* Show mobile logo header */
+  .auth-mobile-header { display: flex; }
+
+  /* Role pills — smaller on mobile */
   .role-select-grid { gap: 5px; }
   .role-option { font-size: 12px; padding: 6px 12px; }
 
-  .otp-box { width: 40px; height: 48px; font-size: 20px; }
+  /* OTP boxes — slightly smaller */
+  .otp-box { width: 40px; height: 50px; font-size: 20px; }
+  .otp-grid { gap: 6px; }
 
+  /* Main app */
   .topbar-inner { padding: 10px 12px; }
   .user-name, .user-role { display: none; }
   .nav-bar { margin: 0 12px 8px; width: calc(100% - 24px); }

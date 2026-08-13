@@ -403,6 +403,14 @@ export default function App() {
         {/* Right Panel */}
         <div className="auth-right">
           <div className="auth-card">
+            {/* Mobile-only branding header */}
+            <div className="auth-mobile-header">
+              <img src="/Logo.png" alt="Logo" className="auth-mobile-logo" />
+              <div>
+                <div className="auth-mobile-title">Attendance Tracker</div>
+                <div className="auth-mobile-sub">Mark attendance. Export reports.</div>
+              </div>
+            </div>
 
             {loginStep === "form" ? (
               <>
