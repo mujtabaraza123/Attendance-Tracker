@@ -270,6 +270,13 @@ export default function App() {
     setForgotEmail(""); setForgotOtp(""); setForgotNewPassword("");
   };
 
+  const handleInputFocus = (e) => {
+    const el = e.target;
+    setTimeout(() => {
+      el.scrollIntoView({ block: "center", behavior: "smooth" });
+    }, 250);
+  };
+
   // ── Attendance ───────────────────────────────────────────────────────────────
   const setStatus = async (empId, dateStr, status, site) => {
     const key  = `${empId}__${dateStr}`;
@@ -442,14 +449,14 @@ export default function App() {
             <form className="auth-form" onSubmit={handleLogin}>
               <div className="fld">
                 <label>Email</label>
-                <input className="finput" type="email" placeholder="you@firm.com" value={loginEmail} onChange={e=>setLoginEmail(e.target.value)} required />
+                <input className="finput" type="email" placeholder="you@firm.com" value={loginEmail} onChange={e=>setLoginEmail(e.target.value)} onFocus={handleInputFocus} required />
               </div>
               <div className="fld">
                 <div className="row-between">
                   <label>Password</label>
                   <button type="button" className="link-btn" style={{fontSize:11}} onClick={()=>switchTab("forgot")}>Forgot password?</button>
                 </div>
-                <input className="finput" type="password" placeholder="Enter your password" value={loginPassword} onChange={e=>setLoginPassword(e.target.value)} required />
+                <input className="finput" type="password" placeholder="Enter your password" value={loginPassword} onChange={e=>setLoginPassword(e.target.value)} onFocus={handleInputFocus} required />
               </div>
               <button className="auth-submit" type="submit" disabled={authLoading}>
                 {authLoading ? <Loader2 size={14} className="spin"/> : "Login"}
@@ -464,7 +471,7 @@ export default function App() {
               <p className="verify-hint">Enter your email address to receive a 6-digit password reset code.</p>
               <div className="fld">
                 <label>Email</label>
-                <input className="finput" type="email" placeholder="you@firm.com" value={forgotEmail} onChange={e=>setForgotEmail(e.target.value)} required />
+                <input className="finput" type="email" placeholder="you@firm.com" value={forgotEmail} onChange={e=>setForgotEmail(e.target.value)} onFocus={handleInputFocus} required />
               </div>
               <button className="auth-submit" type="submit" disabled={authLoading}>
                 {authLoading ? <Loader2 size={14} className="spin"/> : "Send Reset Code"}
@@ -486,6 +493,7 @@ export default function App() {
                   maxLength={6}
                   value={forgotOtp}
                   onChange={e=>setForgotOtp(e.target.value.replace(/\D/g,"").slice(0,6))}
+                  onFocus={handleInputFocus}
                   autoFocus
                 />
               </div>
@@ -497,6 +505,7 @@ export default function App() {
                   placeholder="Enter new password"
                   value={forgotNewPassword}
                   onChange={e=>setForgotNewPassword(e.target.value)}
+                  onFocus={handleInputFocus}
                   required
                 />
               </div>
@@ -517,15 +526,15 @@ export default function App() {
             <form className="auth-form" onSubmit={handleSendOtp}>
               <div className="fld">
                 <label>Name</label>
-                <input className="finput" placeholder="Your full name" value={signupName} onChange={e=>setSignupName(e.target.value)} required />
+                <input className="finput" placeholder="Your full name" value={signupName} onChange={e=>setSignupName(e.target.value)} onFocus={handleInputFocus} required />
               </div>
               <div className="fld">
                 <label>Email</label>
-                <input className="finput" type="email" placeholder="you@firm.com" value={signupEmail} onChange={e=>setSignupEmail(e.target.value)} required />
+                <input className="finput" type="email" placeholder="you@firm.com" value={signupEmail} onChange={e=>setSignupEmail(e.target.value)} onFocus={handleInputFocus} required />
               </div>
               <div className="fld">
                 <label>Password</label>
-                <input className="finput" type="password" placeholder="Create a password" value={signupPassword} onChange={e=>setSignupPassword(e.target.value)} required />
+                <input className="finput" type="password" placeholder="Create a password" value={signupPassword} onChange={e=>setSignupPassword(e.target.value)} onFocus={handleInputFocus} required />
               </div>
               <div className="fld">
                 <label>Role</label>
@@ -555,6 +564,7 @@ export default function App() {
                   maxLength={6}
                   value={otp}
                   onChange={e=>setOtp(e.target.value.replace(/\D/g,"").slice(0,6))}
+                  onFocus={handleInputFocus}
                   autoFocus
                 />
               </div>

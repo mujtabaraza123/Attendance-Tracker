@@ -391,13 +391,15 @@ input, button { font-family: inherit; }
 @media (max-width: 600px) {
   /* Auth */
   .auth-page {
-    padding: 20px 16px;
-    align-items: center;
+    padding: 16px 16px 60px;
+    align-items: flex-start;
     justify-content: center;
-    min-height: 100vh;
+    min-height: 100dvh;
     background: var(--bg);
+    overflow-y: auto;
   }
   .auth-box {
+    margin-top: 3vh;
     border: 1px solid var(--bd);
     border-radius: 16px;
     max-width: 380px;
