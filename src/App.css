@@ -106,6 +106,12 @@ input, button { font-family: inherit; }
   letter-spacing: 5px;
   text-align: center;
 }
+.code-input::placeholder {
+  font-size: 13px !important;
+  font-weight: 400 !important;
+  letter-spacing: normal !important;
+  color: var(--l);
+}
 
 /* Role pills */
 .role-pills { display: flex; flex-wrap: wrap; gap: 5px; }
