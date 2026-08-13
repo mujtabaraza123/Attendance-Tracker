@@ -53,8 +53,15 @@ export default function App() {
   const [signupRole,     setSignupRole]     = useState(DEFAULT_ROLES[0]);
   const [otp, setOtp] = useState("");
 
+  // Forgot password fields
+  const [forgotEmail,       setForgotEmail]       = useState("");
+  const [forgotOtp,         setForgotOtp]         = useState("");
+  const [forgotNewPassword, setForgotNewPassword] = useState("");
+  const [forgotStep,        setForgotStep]        = useState("form"); // "form" | "verify"
+
   const [authLoading, setAuthLoading] = useState(false);
   const [authError,   setAuthError]   = useState("");
+  const [authSuccess, setAuthSuccess] = useState("");
   const [cooldown,    setCooldown]    = useState(0);
 
   // ── App data ─────────────────────────────────────────────────────────────────
@@ -130,7 +137,7 @@ export default function App() {
     const password = loginPassword.trim();
     if (!email || !email.includes("@")) return setAuthError("Please enter a valid email.");
     if (!password) return setAuthError("Please enter your password.");
-    setAuthError(""); setAuthLoading(true);
+    setAuthError(""); setAuthSuccess(""); setAuthLoading(true);
     try {
       const res  = await fetch("/api/login", {
         method:"POST", headers:{"Content-Type":"application/json"},
@@ -157,7 +164,7 @@ export default function App() {
     if (!name)  return setAuthError("Please enter your name.");
     if (!email || !email.includes("@")) return setAuthError("Please enter a valid email.");
     if (!password) return setAuthError("Please create a password.");
-    setAuthError(""); setAuthLoading(true);
+    setAuthError(""); setAuthSuccess(""); setAuthLoading(true);
     try {
       const res  = await fetch("/api/send-otp", {
         method:"POST", headers:{"Content-Type":"application/json"},
@@ -175,7 +182,7 @@ export default function App() {
   const handleVerifyOtp = async (e) => {
     e?.preventDefault();
     if (otp.replace(/\D/g,"").length < 6) return setAuthError("Enter the 6-digit code.");
-    setAuthError(""); setAuthLoading(true);
+    setAuthError(""); setAuthSuccess(""); setAuthLoading(true);
     try {
       const res  = await fetch("/api/verify-otp", {
         method:"POST", headers:{"Content-Type":"application/json"},
@@ -203,18 +210,64 @@ export default function App() {
     } finally { setAuthLoading(false); }
   };
 
+  // FORGOT PASSWORD — send reset code
+  const handleSendResetOtp = async (e) => {
+    e?.preventDefault();
+    const email = forgotEmail.trim();
+    if (!email || !email.includes("@")) return setAuthError("Please enter a valid email.");
+    setAuthError(""); setAuthSuccess(""); setAuthLoading(true);
+    try {
+      const res  = await fetch("/api/send-reset-otp", {
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ email })
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || "Failed to send reset code.");
+      setForgotStep("verify");
+      setCooldown(60);
+    } catch (err) { setAuthError(err.message);
+    } finally { setAuthLoading(false); }
+  };
+
+  // FORGOT PASSWORD — verify code & update password
+  const handleResetPassword = async (e) => {
+    e?.preventDefault();
+    if (forgotOtp.replace(/\D/g,"").length < 6) return setAuthError("Enter the 6-digit code.");
+    if (!forgotNewPassword.trim()) return setAuthError("Please enter a new password.");
+    setAuthError(""); setAuthSuccess(""); setAuthLoading(true);
+    try {
+      const res  = await fetch("/api/reset-password", {
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({
+          email: forgotEmail.trim(),
+          otp: forgotOtp.trim(),
+          newPassword: forgotNewPassword.trim()
+        })
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || "Reset failed.");
+
+      setAuthSuccess("Password updated successfully! Please login with your new password.");
+      setAuthTab("login"); setForgotStep("form");
+      setForgotEmail(""); setForgotOtp(""); setForgotNewPassword("");
+    } catch (err) { setAuthError(err.message);
+    } finally { setAuthLoading(false); }
+  };
+
   const handleLogout = () => {
     setCurrentUser(null);
-    setAuthTab("login"); setAuthStep("form");
+    setAuthTab("login"); setAuthStep("form"); setForgotStep("form");
     setLoginEmail(""); setLoginPassword("");
     setSignupName(""); setSignupEmail(""); setSignupPassword(""); setSignupRole(DEFAULT_ROLES[0]);
-    setOtp(""); setAuthError("");
+    setForgotEmail(""); setForgotOtp(""); setForgotNewPassword("");
+    setOtp(""); setAuthError(""); setAuthSuccess("");
     localStorage.removeItem("adm-user");
   };
 
   const switchTab = (t) => {
-    setAuthTab(t); setAuthStep("form");
-    setAuthError(""); setOtp("");
+    setAuthTab(t); setAuthStep("form"); setForgotStep("form");
+    setAuthError(""); setAuthSuccess(""); setOtp("");
+    setForgotEmail(""); setForgotOtp(""); setForgotNewPassword("");
   };
 
   // ── Attendance ───────────────────────────────────────────────────────────────
@@ -381,7 +434,8 @@ export default function App() {
             <button className={`auth-tab ${authTab==="signup"?"on":""}`} onClick={()=>switchTab("signup")}>Sign Up</button>
           </div>
 
-          {authError && <p className="auth-err">{authError}</p>}
+          {authError   && <p className="auth-err">{authError}</p>}
+          {authSuccess && <p className="auth-note">{authSuccess}</p>}
 
           {/* ── LOGIN ── */}
           {authTab === "login" && (
@@ -391,13 +445,70 @@ export default function App() {
                 <input className="finput" type="email" placeholder="you@firm.com" value={loginEmail} onChange={e=>setLoginEmail(e.target.value)} required />
               </div>
               <div className="fld">
-                <label>Password</label>
+                <div className="row-between">
+                  <label>Password</label>
+                  <button type="button" className="link-btn" style={{fontSize:11}} onClick={()=>switchTab("forgot")}>Forgot password?</button>
+                </div>
                 <input className="finput" type="password" placeholder="Enter your password" value={loginPassword} onChange={e=>setLoginPassword(e.target.value)} required />
               </div>
               <button className="auth-submit" type="submit" disabled={authLoading}>
                 {authLoading ? <Loader2 size={14} className="spin"/> : "Login"}
               </button>
               <p className="auth-switch">Don't have an account? <button type="button" onClick={()=>switchTab("signup")}>Sign up</button></p>
+            </form>
+          )}
+
+          {/* ── FORGOT PASSWORD — STEP 1 ── */}
+          {authTab === "forgot" && forgotStep === "form" && (
+            <form className="auth-form" onSubmit={handleSendResetOtp}>
+              <p className="verify-hint">Enter your email address to receive a 6-digit password reset code.</p>
+              <div className="fld">
+                <label>Email</label>
+                <input className="finput" type="email" placeholder="you@firm.com" value={forgotEmail} onChange={e=>setForgotEmail(e.target.value)} required />
+              </div>
+              <button className="auth-submit" type="submit" disabled={authLoading}>
+                {authLoading ? <Loader2 size={14} className="spin"/> : "Send Reset Code"}
+              </button>
+              <p className="auth-switch">Remember your password? <button type="button" onClick={()=>switchTab("login")}>Login</button></p>
+            </form>
+          )}
+
+          {/* ── FORGOT PASSWORD — STEP 2 ── */}
+          {authTab === "forgot" && forgotStep === "verify" && (
+            <form className="auth-form" onSubmit={handleResetPassword}>
+              <p className="verify-hint">Enter the code sent to <strong>{forgotEmail}</strong> and your new password.</p>
+              <div className="fld">
+                <label>Verification Code</label>
+                <input
+                  className="finput code-input"
+                  type="text" inputMode="numeric"
+                  placeholder="Enter 6-digit code"
+                  maxLength={6}
+                  value={forgotOtp}
+                  onChange={e=>setForgotOtp(e.target.value.replace(/\D/g,"").slice(0,6))}
+                  autoFocus
+                />
+              </div>
+              <div className="fld">
+                <label>New Password</label>
+                <input
+                  className="finput"
+                  type="password"
+                  placeholder="Enter new password"
+                  value={forgotNewPassword}
+                  onChange={e=>setForgotNewPassword(e.target.value)}
+                  required
+                />
+              </div>
+              <button className="auth-submit" type="submit" disabled={authLoading || forgotOtp.replace(/\D/g,"").length < 6 || !forgotNewPassword.trim()}>
+                {authLoading ? <Loader2 size={14} className="spin"/> : "Update Password"}
+              </button>
+              <div className="verify-actions">
+                <button type="button" className="link-btn" onClick={()=>{setForgotStep("form");setForgotOtp("");setForgotNewPassword("");setAuthError("");}}>Back</button>
+                <button type="button" className="link-btn" disabled={cooldown>0} onClick={handleSendResetOtp}>
+                  {cooldown>0 ? `Resend in ${cooldown}s` : "Resend"}
+                </button>
+              </div>
             </form>
           )}
 

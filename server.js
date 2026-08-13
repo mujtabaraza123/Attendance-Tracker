@@ -145,6 +145,75 @@ app.post('/api/verify-otp', (req, res) => {
   res.json({ success: true });
 });
 
+// POST /api/send-reset-otp — send password reset OTP
+app.post('/api/send-reset-otp', async (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ success: false, error: 'Email is required' });
+
+  const cleanEmail = email.toLowerCase().trim();
+
+  try {
+    const userRes = await pool.query(
+      `SELECT id, name FROM public.employees WHERE LOWER(email) = LOWER($1);`,
+      [cleanEmail]
+    );
+
+    if (userRes.rows.length === 0) {
+      return res.json({ success: false, error: 'No account found with this email.' });
+    }
+
+    const userName = userRes.rows[0].name;
+    const otp = String(Math.floor(100000 + Math.random() * 900000));
+    const expiresAt = Date.now() + 10 * 60 * 1000;
+
+    otpStore.set(cleanEmail, { otp, expiresAt });
+
+    await transporter.sendMail({
+      from: '"Attendance Tracker" <no.auth.verify@gmail.com>',
+      to: cleanEmail,
+      subject: `Password Reset Code — ${otp}`,
+      html: `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;max-width:400px;margin:0 auto;padding:32px 16px;background:#f8fafc;"><div style="background:#ffffff;border-radius:14px;padding:32px 24px;border:1px solid #e2e8f0;text-align:center;"><div style="font-size:16px;font-weight:800;color:#0f172a;letter-spacing:-0.3px;margin-bottom:4px;">Attendance Tracker</div><div style="font-size:12px;color:#64748b;margin-bottom:20px;font-weight:500;">Password Reset Code</div><p style="font-size:13px;color:#334155;margin:0 0 12px;text-align:left;">Hi <strong>${userName || 'there'}</strong>,</p><p style="font-size:13px;color:#64748b;margin:0 0 18px;text-align:left;">Your password reset code is:</p><div style="background:#0f172a;color:#ffffff;border-radius:10px;padding:14px 20px;font-size:28px;font-weight:800;letter-spacing:8px;font-family:monospace;display:inline-block;margin:4px 0 18px;">${otp}</div><p style="font-size:11px;color:#94a3b8;margin:10px 0 0;line-height:1.5;">Expires in 10 minutes. If you didn't request a password reset, ignore this email.</p></div></div>`,
+    });
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error sending reset OTP:', err.message);
+    res.status(500).json({ success: false, error: 'Failed to send email: ' + err.message });
+  }
+});
+
+// POST /api/reset-password — verify OTP and update password in DB
+app.post('/api/reset-password', async (req, res) => {
+  const { email, otp, newPassword } = req.body;
+  if (!email || !otp || !newPassword) {
+    return res.status(400).json({ success: false, error: 'Email, code, and new password are required' });
+  }
+
+  const key = email.toLowerCase().trim();
+  const record = otpStore.get(key);
+
+  if (!record) return res.json({ success: false, error: 'No reset request found for this email.' });
+  if (Date.now() > record.expiresAt) {
+    otpStore.delete(key);
+    return res.json({ success: false, error: 'Reset code has expired. Please request a new one.' });
+  }
+  if (record.otp !== String(otp).trim()) {
+    return res.json({ success: false, error: 'Incorrect verification code. Please try again.' });
+  }
+
+  try {
+    await pool.query(
+      `UPDATE public.employees SET password = $1 WHERE LOWER(email) = LOWER($2);`,
+      [newPassword.trim(), key]
+    );
+    otpStore.delete(key);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error resetting password:', err.message);
+    res.status(500).json({ success: false, error: 'Failed to update password: ' + err.message });
+  }
+});
+
 // GET all employees, roles, and attendance records
 app.get('/api/all-data', async (req, res) => {
   try {
