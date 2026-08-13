@@ -349,270 +349,308 @@ export default function AttendanceTracker() {
   if (loading) {
     return (
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100vh" }}>
-        <Loader2 size={24} style={{ animation: "spin 1s linear infinite", marginBottom: 12, color: "#0f172a" }} />
-        <span style={{ fontSize: 14, color: "#64748b", fontWeight: 500 }}>Loading register...</span>
+        <Loader2 size={28} style={{ animation: "spin 1s linear infinite", marginBottom: 12, color: "#0f172a" }} />
+        <span style={{ fontSize: 14, color: "#64748b", fontWeight: 600 }}>Opening Attendance Register...</span>
       </div>
     );
   }
 
   return (
-    <div className="app-wrapper">
-      <div className="app-card">
-        
-        {/* Header */}
-        <div className="app-header">
-          <div className="header-top">
-            <div className="header-title-group">
-              <h1>Attendance Register</h1>
-              <p>{employees.length} {employees.length === 1 ? "employee" : "employees"} registered</p>
-            </div>
+    <div className="app-container">
+      
+      {/* Sticky Full-Width Header */}
+      <header className="top-header">
+        <div className="header-inner">
+          <div className="header-brand">
+            <h1>Attendance Register</h1>
+            <span className="emp-counter-badge">
+              {employees.length} {employees.length === 1 ? "Employee" : "Employees"}
+            </span>
           </div>
 
-          {/* Navigation Tabs */}
-          <div className="nav-tabs">
-            <button className={`nav-tab ${tab === "today" ? "active" : ""}`} onClick={() => setTab("today")}>
+          {/* Segmented Navigation Bar */}
+          <nav className="segmented-nav">
+            <button className={`nav-pill ${tab === "today" ? "active" : ""}`} onClick={() => setTab("today")}>
               <CalendarDays size={16} /> Mark Attendance
             </button>
-            <button className={`nav-tab ${tab === "register" ? "active" : ""}`} onClick={() => setTab("register")}>
+            <button className={`nav-pill ${tab === "register" ? "active" : ""}`} onClick={() => setTab("register")}>
               <BookOpen size={16} /> Monthly Register
             </button>
-            <button className={`nav-tab ${tab === "employees" ? "active" : ""}`} onClick={() => setTab("employees")}>
+            <button className={`nav-pill ${tab === "employees" ? "active" : ""}`} onClick={() => setTab("employees")}>
               <Users size={16} /> Employees
             </button>
-          </div>
+          </nav>
         </div>
+      </header>
 
-        {/* Body Content */}
-        <div className="app-body" key={tab}>
-          {saveError && (
-            <div style={{ background: "#f8fafc", border: "1px solid #cbd5e1", color: "#334155", padding: "12px 16px", borderRadius: 12, marginBottom: 20, fontSize: 13, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <AlertCircle size={16} />
-                <span>{saveErrorMessage}</span>
-              </div>
-              <button onClick={() => setSaveError(false)} style={{ background: "none", border: "none", cursor: "pointer", fontWeight: "bold", color: "#334155" }}>✕</button>
+      {/* Main Content Area */}
+      <main className="main-content" key={tab}>
+        {saveError && (
+          <div style={{ background: "#ffffff", border: "1px solid #cbd5e1", color: "#334155", padding: "12px 16px", borderRadius: 12, marginBottom: 20, fontSize: 13, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <AlertCircle size={16} />
+              <span>{saveErrorMessage}</span>
             </div>
-          )}
+            <button onClick={() => setSaveError(false)} style={{ background: "none", border: "none", cursor: "pointer", fontWeight: "bold", color: "#334155" }}>✕</button>
+          </div>
+        )}
 
-          {/* Tab 1: Mark Attendance */}
-          {tab === "today" && (
-            <div>
-              <div className="date-nav">
-                <div className="date-controls">
-                  <button className="btn-icon" onClick={() => setSelectedDate(new Date(selectedDate.getTime() - 86400000))}>
-                    <ChevronLeft size={18} />
-                  </button>
-                  <span className="date-heading">
-                    {selectedDate.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })}
-                  </span>
-                  <button className="btn-icon" onClick={() => setSelectedDate(new Date(selectedDate.getTime() + 86400000))}>
-                    <ChevronRight size={18} />
-                  </button>
-                </div>
-
-                <button className="btn-secondary" onClick={() => setSelectedDate(new Date())}>
-                  Today
+        {/* Tab 1: Mark Attendance */}
+        {tab === "today" && (
+          <div>
+            <div className="date-bar">
+              <div className="date-selector">
+                <button className="icon-btn" onClick={() => setSelectedDate(new Date(selectedDate.getTime() - 86400000))}>
+                  <ChevronLeft size={18} />
+                </button>
+                <span className="date-text">
+                  {selectedDate.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })}
+                </span>
+                <button className="icon-btn" onClick={() => setSelectedDate(new Date(selectedDate.getTime() + 86400000))}>
+                  <ChevronRight size={18} />
                 </button>
               </div>
 
-              {employees.length === 0 ? (
-                <div style={{ textAlign: "center", padding: "48px 0", color: "#64748b", fontSize: 14 }}>
-                  No employees registered. Add employees in the Employees tab.
+              <button className="today-btn" onClick={() => setSelectedDate(new Date())}>
+                Today
+              </button>
+            </div>
+
+            {/* Quick Add Employee Card if no employees */}
+            {employees.length === 0 ? (
+              <div className="add-emp-card" style={{ textAlign: "center", padding: "36px 20px" }}>
+                <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 6, color: "#0f172a" }}>No Employees Added Yet</div>
+                <div style={{ fontSize: 13, color: "#64748b", marginBottom: 20 }}>Add your first team member to start taking attendance</div>
+
+                <div className="add-emp-grid" style={{ maxWidth: 600, margin: "0 auto" }}>
+                  <input
+                    className="input-box"
+                    placeholder="Employee name (e.g. Hassan)"
+                    value={newEmpName}
+                    onChange={(e) => setNewEmpName(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && addEmployee()}
+                  />
+                  <input
+                    className="input-box"
+                    placeholder="Role (e.g. Staff)"
+                    value={newEmpRole}
+                    onChange={(e) => setNewEmpRole(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && addEmployee()}
+                  />
+                  <button className="primary-add-btn" onClick={addEmployee}>
+                    <Plus size={18} /> Add Employee
+                  </button>
                 </div>
-              ) : (
-                employees.map((emp) => {
-                  const key = `${emp.id}__${selectedDateStr}`;
-                  const rec = attendance[key];
-                  const currentStatus = rec?.status;
+              </div>
+            ) : (
+              employees.map((emp) => {
+                const key = `${emp.id}__${selectedDateStr}`;
+                const rec = attendance[key];
+                const currentStatus = rec?.status;
+                const initial = emp.name ? emp.name.charAt(0).toUpperCase() : "?";
 
-                  return (
-                    <div className="emp-card" key={emp.id}>
-                      <div className="emp-info">
-                        <div className="emp-info-name">{emp.name}</div>
-                        <div className="emp-info-role">{emp.role}</div>
-                      </div>
-
-                      <div className="emp-actions">
-                        {currentStatus === "present" && (
-                          <input
-                            className="site-input-field"
-                            placeholder="Office / Client site"
-                            value={siteDrafts[key] ?? rec?.site ?? ""}
-                            onChange={(e) => setSiteDrafts({ ...siteDrafts, [key]: e.target.value })}
-                            onBlur={(e) => setStatus(emp.id, selectedDateStr, "present", e.target.value)}
-                          />
-                        )}
-
-                        <div className="status-button-group">
-                          {["present", "absent", "leave", "half"].map((s) => {
-                            const meta = STATUS[s];
-                            const isActive = currentStatus === s;
-                            return (
-                              <button
-                                key={s}
-                                className={`status-btn-item ${isActive ? `active-${meta.short}` : ""}`}
-                                title={meta.label}
-                                onClick={() => setStatus(emp.id, selectedDateStr, isActive ? null : s)}
-                              >
-                                {meta.short}
-                              </button>
-                            );
-                          })}
-                        </div>
+                return (
+                  <div className="emp-item-card" key={emp.id}>
+                    <div className="emp-avatar-group">
+                      <div className="emp-avatar">{initial}</div>
+                      <div>
+                        <div className="emp-name-text">{emp.name}</div>
+                        <div className="emp-role-text">{emp.role}</div>
                       </div>
                     </div>
-                  );
-                })
-              )}
-            </div>
-          )}
 
-          {/* Tab 2: Monthly Register */}
-          {tab === "register" && (
-            <div>
-              <div className="date-nav">
-                <div className="date-controls">
-                  <button className="btn-icon" onClick={() => setRegisterMonth(new Date(registerMonth.getFullYear(), registerMonth.getMonth() - 1, 1))}>
-                    <ChevronLeft size={18} />
-                  </button>
-                  <span className="date-heading">{monthLabel(registerMonth)}</span>
-                  <button className="btn-icon" onClick={() => setRegisterMonth(new Date(registerMonth.getFullYear(), registerMonth.getMonth() + 1, 1))}>
-                    <ChevronRight size={18} />
-                  </button>
-                </div>
-              </div>
+                    <div className="emp-item-right">
+                      {currentStatus === "present" && (
+                        <input
+                          className="site-field"
+                          placeholder="Office / Client site"
+                          value={siteDrafts[key] ?? rec?.site ?? ""}
+                          onChange={(e) => setSiteDrafts({ ...siteDrafts, [key]: e.target.value })}
+                          onBlur={(e) => setStatus(emp.id, selectedDateStr, "present", e.target.value)}
+                        />
+                      )}
 
-              <div className="export-actions">
-                <button className="btn-secondary" onClick={exportMonthlyRegister} disabled={employees.length === 0}>
-                  <Download size={15} /> Export Register (Excel)
-                </button>
-                <button className="btn-secondary" onClick={exportClientWiseReport} disabled={employees.length === 0}>
-                  <Building2 size={15} /> Export Client Report (Excel)
-                </button>
-                {exportNote && <span style={{ fontSize: 12, color: "#0f766e", fontWeight: 600, alignSelf: "center" }}>{exportNote}</span>}
-              </div>
-
-              <div className="legend-bar">
-                {Object.values(STATUS).map((s) => (
-                  <div className="legend-tag" key={s.key}>
-                    <span className="legend-box" style={{ background: s.color }} />
-                    <span>{s.label} ({s.short})</span>
+                      <div className="status-pill-group">
+                        {["present", "absent", "leave", "half"].map((s) => {
+                          const meta = STATUS[s];
+                          const isActive = currentStatus === s;
+                          return (
+                            <button
+                              key={s}
+                              className={`status-pill ${isActive ? `active-${meta.short}` : ""}`}
+                              title={meta.label}
+                              onClick={() => setStatus(emp.id, selectedDateStr, isActive ? null : s)}
+                            >
+                              {meta.short}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
                   </div>
-                ))}
+                );
+              })
+            )}
+          </div>
+        )}
+
+        {/* Tab 2: Monthly Register */}
+        {tab === "register" && (
+          <div>
+            <div className="date-bar">
+              <div className="date-selector">
+                <button className="icon-btn" onClick={() => setRegisterMonth(new Date(registerMonth.getFullYear(), registerMonth.getMonth() - 1, 1))}>
+                  <ChevronLeft size={18} />
+                </button>
+                <span className="date-text">{monthLabel(registerMonth)}</span>
+                <button className="icon-btn" onClick={() => setRegisterMonth(new Date(registerMonth.getFullYear(), registerMonth.getMonth() + 1, 1))}>
+                  <ChevronRight size={18} />
+                </button>
               </div>
-
-              {employees.length === 0 ? (
-                <div style={{ textAlign: "center", padding: "48px 0", color: "#64748b", fontSize: 14 }}>
-                  No employees registered.
-                </div>
-              ) : (
-                <div className="table-scroll-container">
-                  <table className="register-table">
-                    <thead>
-                      <tr>
-                        <th className="emp-head">Employee</th>
-                        {monthDays.map((d) => <th key={d}>{d}</th>)}
-                        <th>%</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {employees.map((emp) => (
-                        <tr key={emp.id}>
-                          <td className="emp-cell">
-                            <div style={{ fontWeight: 600, color: "#0f172a" }}>{emp.name}</div>
-                          </td>
-                          {monthDays.map((day) => {
-                            const ds = fmtDate(new Date(registerMonth.getFullYear(), registerMonth.getMonth(), day));
-                            const rec = attendance[`${emp.id}__${ds}`];
-                            const meta = rec ? STATUS[rec.status] : null;
-
-                            return (
-                              <td key={day}>
-                                <div
-                                  className={`table-cell-badge ${meta ? `cell-${meta.short}` : "cell-empty"}`}
-                                  title={meta ? `${meta.label}${rec.site ? " — " + rec.site : ""}` : "Not marked"}
-                                  onClick={() => cycleStatus(emp.id, ds)}
-                                >
-                                  {meta ? meta.short : ""}
-                                </div>
-                              </td>
-                            );
-                          })}
-                          <td>
-                            <span style={{ fontWeight: 600, color: monthStats[emp.id] == null ? "#94a3b8" : "#0f172a" }}>
-                              {monthStats[emp.id] == null ? "—" : `${monthStats[emp.id]}%`}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
             </div>
-          )}
 
-          {/* Tab 3: Employees */}
-          {tab === "employees" && (
-            <div>
-              <div className="add-form">
+            <div className="export-row">
+              <button className="export-btn" onClick={exportMonthlyRegister} disabled={employees.length === 0}>
+                <Download size={16} /> Export Monthly Register (Excel)
+              </button>
+              <button className="export-btn" onClick={exportClientWiseReport} disabled={employees.length === 0}>
+                <Building2 size={16} /> Export Client Report (Excel)
+              </button>
+              {exportNote && <span style={{ fontSize: 13, color: "#0f766e", fontWeight: 700, alignSelf: "center" }}>{exportNote}</span>}
+            </div>
+
+            <div style={{ display: "flex", gap: 16, marginBottom: 16, flexWrap: "wrap", fontSize: 13, color: "#64748b" }}>
+              {Object.values(STATUS).map((s) => (
+                <div key={s.key} style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 600 }}>
+                  <span style={{ width: 12, height: 12, borderRadius: 4, background: s.color }} />
+                  <span>{s.label} ({s.short})</span>
+                </div>
+              ))}
+            </div>
+
+            {employees.length === 0 ? (
+              <div style={{ textAlign: "center", padding: "48px 0", color: "#64748b", fontSize: 14 }}>
+                No employees registered.
+              </div>
+            ) : (
+              <div className="table-wrapper">
+                <table className="reg-grid">
+                  <thead>
+                    <tr>
+                      <th className="sticky-name">Employee</th>
+                      {monthDays.map((d) => <th key={d}>{d}</th>)}
+                      <th>%</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {employees.map((emp) => (
+                      <tr key={emp.id}>
+                        <td className="sticky-name">
+                          <div style={{ fontWeight: 700, color: "#0f172a" }}>{emp.name}</div>
+                        </td>
+                        {monthDays.map((day) => {
+                          const ds = fmtDate(new Date(registerMonth.getFullYear(), registerMonth.getMonth(), day));
+                          const rec = attendance[`${emp.id}__${ds}`];
+                          const meta = rec ? STATUS[rec.status] : null;
+
+                          return (
+                            <td key={day}>
+                              <div
+                                className={`grid-cell-badge ${meta ? `cell-${meta.short}` : "cell-empty"}`}
+                                title={meta ? `${meta.label}${rec.site ? " — " + rec.site : ""}` : "Not marked"}
+                                onClick={() => cycleStatus(emp.id, ds)}
+                              >
+                                {meta ? meta.short : ""}
+                              </div>
+                            </td>
+                          );
+                        })}
+                        <td>
+                          <span style={{ fontWeight: 700, color: monthStats[emp.id] == null ? "#94a3b8" : "#0f172a" }}>
+                            {monthStats[emp.id] == null ? "—" : `${monthStats[emp.id]}%`}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Tab 3: Employees */}
+        {tab === "employees" && (
+          <div>
+            {/* Dedicated Prominent Add Employee Card */}
+            <div className="add-emp-card">
+              <div className="add-emp-title">+ Add New Employee</div>
+              <div className="add-emp-grid">
                 <input
-                  className="text-input"
-                  placeholder="Employee name"
+                  className="input-box"
+                  placeholder="Employee name (e.g. Hassan)"
                   value={newEmpName}
                   onChange={(e) => setNewEmpName(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && addEmployee()}
                 />
                 <input
-                  className="text-input"
+                  className="input-box"
                   placeholder="Role (e.g. Audit Associate)"
                   value={newEmpRole}
                   onChange={(e) => setNewEmpRole(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && addEmployee()}
                 />
-                <button className="btn-primary" onClick={addEmployee}>
-                  <Plus size={16} /> Add Employee
+                <button className="primary-add-btn" onClick={addEmployee}>
+                  <Plus size={18} /> Add Employee
                 </button>
               </div>
+            </div>
 
-              {employees.length === 0 ? (
-                <div style={{ textAlign: "center", padding: "36px 0", color: "#64748b", fontSize: 14 }}>
-                  No employees yet. Add your first employee above.
-                </div>
-              ) : (
-                employees.map((emp) => (
-                  <div className="emp-card" key={emp.id}>
-                    <div>
-                      <div className="emp-info-name">{emp.name}</div>
-                      <div className="emp-info-role">{emp.role}</div>
+            {/* Employees List */}
+            {employees.length === 0 ? (
+              <div style={{ textAlign: "center", padding: "40px 0", color: "#64748b", fontSize: 14 }}>
+                No employees added yet. Use the form above to add your first employee.
+              </div>
+            ) : (
+              employees.map((emp) => {
+                const initial = emp.name ? emp.name.charAt(0).toUpperCase() : "?";
+                return (
+                  <div className="emp-item-card" key={emp.id}>
+                    <div className="emp-avatar-group">
+                      <div className="emp-avatar">{initial}</div>
+                      <div>
+                        <div className="emp-name-text">{emp.name}</div>
+                        <div className="emp-role-text">{emp.role}</div>
+                      </div>
                     </div>
-                    <button className="btn-neutral-remove" onClick={() => removeEmployee(emp.id)}>
+
+                    <button className="remove-btn" onClick={() => removeEmployee(emp.id)}>
                       <Trash2 size={14} /> Remove
                     </button>
                   </div>
-                ))
-              )}
+                );
+              })
+            )}
 
-              <div style={{ marginTop: 36, paddingTop: 24, borderTop: "1px solid #e2e8f0" }}>
-                {!confirmClear ? (
-                  <button className="btn-neutral-remove" onClick={() => setConfirmClear(true)}>
-                    <Trash2 size={14} /> Clear all data
-                  </button>
-                ) : (
-                  <div style={{ fontSize: 13, color: "#334155" }}>
-                    This permanently removes all employees and attendance logs.
-                    <div style={{ marginTop: 12, display: "flex", gap: 10 }}>
-                      <button className="btn-neutral-remove" style={{ background: "#334155", color: "#fff", borderColor: "#334155" }} onClick={clearAllData}>Confirm Clear</button>
-                      <button className="btn-secondary" onClick={() => setConfirmClear(false)}>Cancel</button>
-                    </div>
+            <div style={{ marginTop: 40, paddingTop: 20, borderTop: "1px solid #e2e8f0" }}>
+              {!confirmClear ? (
+                <button className="remove-btn" onClick={() => setConfirmClear(true)}>
+                  <Trash2 size={14} /> Clear all data
+                </button>
+              ) : (
+                <div style={{ fontSize: 13, color: "#334155" }}>
+                  This permanently removes all employees and attendance logs.
+                  <div style={{ marginTop: 12, display: "flex", gap: 10 }}>
+                    <button className="remove-btn" style={{ background: "#334155", color: "#fff", borderColor: "#334155" }} onClick={clearAllData}>Confirm Clear</button>
+                    <button className="today-btn" onClick={() => setConfirmClear(false)}>Cancel</button>
                   </div>
-                )}
-              </div>
+                </div>
+              )}
             </div>
-          )}
+          </div>
+        )}
 
-        </div>
-      </div>
+      </main>
     </div>
   );
 }
