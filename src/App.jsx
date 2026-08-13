@@ -110,7 +110,6 @@ export default function AttendanceTracker() {
         
         if (data.roles && data.roles.length > 0) {
           const titles = data.roles.map(r => r.title);
-          // Combine with default roles avoiding duplicates
           const combined = Array.from(new Set([...DEFAULT_ROLES, ...titles]));
           setRolesList(combined);
         }
@@ -147,7 +146,6 @@ export default function AttendanceTracker() {
     };
   }, [fetchData]);
 
-  // Add Employee
   const addEmployee = async () => {
     const name = newEmpName.trim();
     if (!name) return;
@@ -158,7 +156,6 @@ export default function AttendanceTracker() {
       if (!custom) return;
       roleToSave = custom;
       
-      // Save new role to DB
       try {
         await fetch("/api/roles", {
           method: "POST",
@@ -286,7 +283,6 @@ export default function AttendanceTracker() {
 
   const selectedDateStr = fmtDate(selectedDate);
 
-  // Today stats for summary meter
   const todayStats = useMemo(() => {
     let present = 0, absent = 0, leave = 0, half = 0, marked = 0;
     employees.forEach(emp => {
@@ -304,7 +300,6 @@ export default function AttendanceTracker() {
     return { present, absent, leave, half, marked, total, pct };
   }, [attendance, employees, selectedDateStr]);
 
-  // Filtered employees list based on filter chip
   const filteredEmployees = useMemo(() => {
     if (filterStatus === "all") return employees;
     return employees.filter(emp => {
@@ -451,7 +446,7 @@ export default function AttendanceTracker() {
     return (
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100vh" }}>
         <Loader2 size={28} style={{ animation: "spin 1s linear infinite", marginBottom: 12, color: "#0f172a" }} />
-        <span style={{ fontSize: 14, color: "#64748b", fontWeight: 600 }}>Loading Attendance Register...</span>
+        <span style={{ fontSize: 14, color: "#64748b", fontWeight: 600 }}>Opening Attendance Marker...</span>
       </div>
     );
   }
@@ -463,7 +458,10 @@ export default function AttendanceTracker() {
       <header className="top-header">
         <div className="header-inner">
           <div className="header-brand">
-            <h1>Attendance Register</h1>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <img src="/Logo.png" alt="Attendance Marker Logo" style={{ width: 34, height: 34, objectFit: "contain", borderRadius: 8 }} />
+              <h1>Attendance Marker</h1>
+            </div>
             <span className="emp-counter-badge">
               {employees.length} {employees.length === 1 ? "Employee" : "Employees"}
             </span>
