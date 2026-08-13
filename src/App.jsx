@@ -161,7 +161,6 @@ export default function App() {
       const data = await res.json();
       if (!data.success) throw new Error(data.error||"Failed to send");
       setAuthStep("verify");
-      setAuthNote(`Code sent to ${email}`);
       setCooldown(60);
     } catch (err) { setAuthError(err.message);
     } finally { setAuthLoading(false); }
@@ -377,7 +376,6 @@ export default function App() {
           </div>
 
           {authError && <p className="auth-err">{authError}</p>}
-          {authNote  && <p className="auth-note">{authNote}</p>}
 
           {/* ── LOGIN ── */}
           {authTab === "login" && (
