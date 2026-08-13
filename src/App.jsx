@@ -1,153 +1,166 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { 
-  Check, 
-  X, 
-  Clock, 
-  Minus, 
-  Plus, 
-  Trash2, 
-  ChevronLeft, 
-  ChevronRight, 
-  Users, 
-  CalendarDays, 
-  BookOpen, 
-  Loader2, 
-  Download, 
-  Building2, 
-  AlertCircle,
-  CheckCheck,
-  UserCheck,
-  Briefcase,
-  LogOut,
-  ArrowRight
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import {
+  CalendarDays, BookOpen, Users, ChevronLeft, ChevronRight,
+  Plus, Trash2, Download, Building2, CheckCheck, AlertCircle,
+  Loader2, ArrowRight, Mail, User, Briefcase, LogOut, X
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import "./App.css";
 
+// ── helpers ───────────────────────────────────────────────────────────────────
 const STATUS = {
-  present: { key: "present", label: "Present", short: "P", color: "#0f766e" },
-  absent: { key: "absent", label: "Absent", short: "A", color: "#334155" },
-  leave: { key: "leave", label: "Leave", short: "L", color: "#b45309" },
-  half: { key: "half", label: "Half Day", short: "H", color: "#64748b" },
+  present: { key: "present", label: "Present", short: "P", color: "#16a34a" },
+  absent:  { key: "absent",  label: "Absent",  short: "A", color: "#334155" },
+  leave:   { key: "leave",   label: "Leave",   short: "L", color: "#d97706" },
+  half:    { key: "half",    label: "Half Day", short: "H", color: "#6366f1" },
 };
 const STATUS_CYCLE = ["present", "absent", "leave", "half", null];
 
 const DEFAULT_ROLES = [
-  "Audit Associate",
-  "Senior Associate",
-  "Assistant Manager",
-  "Manager",
-  "Partner",
-  "Trainee",
-  "Staff"
+  "Audit Associate", "Senior Associate", "Assistant Manager",
+  "Manager", "Partner", "Trainee", "Staff"
 ];
 
-function fmtDate(d) {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
+const ROLE_ICONS = {
+  "Audit Associate": "🔍", "Senior Associate": "⭐", "Assistant Manager": "📋",
+  "Manager": "💼", "Partner": "🤝", "Trainee": "📚", "Staff": "👤"
+};
 
+function fmtDate(d) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+}
 function monthLabel(d) {
   return d.toLocaleDateString("en-US", { month: "long", year: "numeric" });
 }
-
-function uid() {
-  return Math.random().toString(36).slice(2, 10);
-}
-
-const OFFICE_ALIASES = new Set(["office", "hq", "head office", "main office", ""]);
-
+function uid() { return Math.random().toString(36).slice(2, 10); }
 function isClientSite(site) {
   if (!site) return false;
-  return !OFFICE_ALIASES.has(site.trim().toLowerCase());
+  return !["office","hq","head office","main office",""].includes(site.trim().toLowerCase());
+}
+function safeSheetName(name, used) {
+  let base = String(name).replace(/[\\/?*[\]]/g,"-").slice(0,31).trim()||"Sheet";
+  let c = base, n = 2;
+  while (used.has(c.toLowerCase())) { const s=` (${n})`; c=base.slice(0,31-s.length)+s; n++; }
+  used.add(c.toLowerCase()); return c;
 }
 
-function safeSheetName(name, usedNames) {
-  let base = String(name).replace(/[\\/?*[\]]/g, "-").slice(0, 31).trim() || "Sheet";
-  let candidate = base;
-  let n = 2;
-  while (usedNames.has(candidate.toLowerCase())) {
-    const suffix = ` (${n})`;
-    candidate = base.slice(0, 31 - suffix.length) + suffix;
-    n += 1;
-  }
-  usedNames.add(candidate.toLowerCase());
-  return candidate;
+// ── OTP Input Component (6 individual boxes) ─────────────────────────────────
+function OtpInput({ value, onChange }) {
+  const inputs = useRef([]);
+  const digits = value.split("").concat(Array(6).fill("")).slice(0, 6);
+
+  const handleChange = (i, e) => {
+    const v = e.target.value.replace(/\D/g, "").slice(-1);
+    const next = [...digits]; next[i] = v;
+    onChange(next.join(""));
+    if (v && i < 5) inputs.current[i + 1]?.focus();
+  };
+
+  const handleKeyDown = (i, e) => {
+    if (e.key === "Backspace" && !digits[i] && i > 0) {
+      inputs.current[i - 1]?.focus();
+      const next = [...digits]; next[i - 1] = "";
+      onChange(next.join(""));
+    }
+    if (e.key === "ArrowLeft" && i > 0) inputs.current[i - 1]?.focus();
+    if (e.key === "ArrowRight" && i < 5) inputs.current[i + 1]?.focus();
+  };
+
+  const handlePaste = (e) => {
+    const pasted = e.clipboardData.getData("text").replace(/\D/g,"").slice(0,6);
+    if (pasted) { onChange(pasted.padEnd(6,"").slice(0,6)); inputs.current[Math.min(pasted.length,5)]?.focus(); }
+    e.preventDefault();
+  };
+
+  return (
+    <div className="otp-grid">
+      {digits.map((d, i) => (
+        <input
+          key={i}
+          ref={el => inputs.current[i] = el}
+          className={`otp-box ${d ? "otp-filled" : ""}`}
+          type="text" inputMode="numeric" maxLength={1}
+          value={d}
+          onChange={e => handleChange(i, e)}
+          onKeyDown={e => handleKeyDown(i, e)}
+          onPaste={handlePaste}
+        />
+      ))}
+    </div>
+  );
 }
 
-export default function AttendanceTracker() {
+// ── Main App ──────────────────────────────────────────────────────────────────
+export default function App() {
+  // Auth state
+  const [currentUser, setCurrentUser] = useState(() => {
+    try { const r = localStorage.getItem("adm-user"); return r ? JSON.parse(r) : null; } catch { return null; }
+  });
+
+  // Login form state
+  const [loginStep, setLoginStep] = useState("form"); // "form" | "verify"
+  const [loginName, setLoginName] = useState("");
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginRole, setLoginRole] = useState(DEFAULT_ROLES[0]);
+  const [otp, setOtp] = useState("");
+  const [loginLoading, setLoginLoading] = useState(false);
+  const [loginError, setLoginError] = useState("");
+  const [loginSuccess, setLoginSuccess] = useState("");
+  const [resendCooldown, setResendCooldown] = useState(0);
+
+  // App data state
   const [loading, setLoading] = useState(true);
-  const [saveError, setSaveError] = useState(false);
-  const [saveErrorMessage, setSaveErrorMessage] = useState("");
   const [employees, setEmployees] = useState([]);
   const [rolesList, setRolesList] = useState(DEFAULT_ROLES);
   const [attendance, setAttendance] = useState({});
   const [tab, setTab] = useState("today");
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [registerMonth, setRegisterMonth] = useState(new Date());
-  
-  // Current logged in user session
-  const [currentUser, setCurrentUser] = useState(() => {
-    try {
-      const raw = localStorage.getItem("adm-current-user");
-      return raw ? JSON.parse(raw) : null;
-    } catch (e) {
-      return null;
-    }
-  });
-
-  // Login form state
-  const [loginEmpId, setLoginEmpId] = useState("");
-  const [loginNameInput, setLoginNameInput] = useState("");
-  const [loginRoleSelect, setLoginRoleSelect] = useState(DEFAULT_ROLES[0]);
-  const [isNewLoginUser, setIsNewLoginUser] = useState(false);
-
-  // Management Add Employee Form State
-  const [newEmpName, setNewEmpName] = useState("");
-  const [selectedRole, setSelectedRole] = useState(DEFAULT_ROLES[0]);
-  const [customRoleInput, setCustomRoleInput] = useState("");
-  const [showCustomRole, setShowCustomRole] = useState(false);
-
   const [filterStatus, setFilterStatus] = useState("all");
   const [siteDrafts, setSiteDrafts] = useState({});
-  const [confirmClear, setConfirmClear] = useState(false);
   const [exportNote, setExportNote] = useState("");
+  const [appError, setAppError] = useState("");
 
+  // Add employee form
+  const [newEmpName, setNewEmpName] = useState("");
+  const [newEmpEmail, setNewEmpEmail] = useState("");
+  const [newEmpRole, setNewEmpRole] = useState(DEFAULT_ROLES[0]);
+  const [confirmClear, setConfirmClear] = useState(false);
+
+  // Resend cooldown timer
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const t = setTimeout(() => setResendCooldown(c => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [resendCooldown]);
+
+  // Fetch data
   const fetchData = useCallback(async (isInitial = false) => {
     if (isInitial) setLoading(true);
-
     try {
       const res = await fetch("/api/all-data");
-      if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      
       if (data.success) {
         setEmployees(data.employees || []);
         setAttendance(data.attendance || {});
-        
-        if (data.roles && data.roles.length > 0) {
+        if (data.roles?.length > 0) {
           const titles = data.roles.map(r => r.title);
-          const combined = Array.from(new Set([...DEFAULT_ROLES, ...titles]));
-          setRolesList(combined);
+          setRolesList(Array.from(new Set([...DEFAULT_ROLES, ...titles])));
         }
-
         try {
           localStorage.setItem("adm-employees", JSON.stringify(data.employees || []));
           localStorage.setItem("adm-attendance", JSON.stringify(data.attendance || {}));
-        } catch (e) {}
-      } else {
-        throw new Error(data.error || "Failed to fetch");
+        } catch {}
       }
-    } catch (err) {
+    } catch {
       if (isInitial) {
         try {
-          const empRaw = localStorage.getItem("adm-employees");
-          const attRaw = localStorage.getItem("adm-attendance");
-          if (empRaw) setEmployees(JSON.parse(empRaw));
-          if (attRaw) setAttendance(JSON.parse(attRaw));
-        } catch (e) {}
+          const e = localStorage.getItem("adm-employees");
+          const a = localStorage.getItem("adm-attendance");
+          if (e) setEmployees(JSON.parse(e));
+          if (a) setAttendance(JSON.parse(a));
+        } catch {}
       }
     } finally {
       if (isInitial) setLoading(false);
@@ -156,559 +169,472 @@ export default function AttendanceTracker() {
 
   useEffect(() => {
     fetchData(true);
-    const interval = setInterval(() => fetchData(false), 3000);
-    const handleFocus = () => fetchData(false);
-    window.addEventListener("focus", handleFocus);
-    return () => {
-      clearInterval(interval);
-      window.removeEventListener("focus", handleFocus);
-    };
+    const iv = setInterval(() => fetchData(false), 3000);
+    const onFocus = () => fetchData(false);
+    window.addEventListener("focus", onFocus);
+    return () => { clearInterval(iv); window.removeEventListener("focus", onFocus); };
   }, [fetchData]);
 
-  // Handle Login submission
-  const handleLoginSubmit = async (e) => {
+  // ── Login handlers ──────────────────────────────────────────────────────────
+  const handleSendOtp = async (e) => {
     e?.preventDefault();
+    if (!loginName.trim()) return setLoginError("Please enter your full name.");
+    if (!loginEmail.trim() || !loginEmail.includes("@")) return setLoginError("Please enter a valid email address.");
+    setLoginError(""); setLoginLoading(true);
 
-    let userToSave = null;
+    try {
+      const res = await fetch("/api/send-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: loginEmail.trim(), name: loginName.trim() })
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || "Failed to send email");
+      setLoginStep("verify");
+      setLoginSuccess(`Code sent to ${loginEmail}`);
+      setResendCooldown(60);
+    } catch (err) {
+      setLoginError(err.message);
+    } finally {
+      setLoginLoading(false);
+    }
+  };
 
-    if (!isNewLoginUser && loginEmpId) {
-      const found = employees.find(emp => emp.id === loginEmpId);
-      if (found) {
-        userToSave = found;
+  const handleVerifyOtp = async (e) => {
+    e?.preventDefault();
+    if (otp.replace(/\D/g,"").length < 6) return setLoginError("Please enter the full 6-digit code.");
+    setLoginError(""); setLoginLoading(true);
+
+    try {
+      const res = await fetch("/api/verify-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: loginEmail.trim(), otp: otp.trim() })
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || "Verification failed");
+
+      // Check if employee exists by email, else create
+      const existing = employees.find(emp => emp.email?.toLowerCase() === loginEmail.toLowerCase().trim());
+      let userObj;
+      if (existing) {
+        userObj = existing;
+      } else {
+        userObj = { id: uid(), name: loginName.trim(), email: loginEmail.trim(), role: loginRole };
+        setEmployees(prev => [...prev, userObj]);
+        try {
+          await fetch("/api/employees", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(userObj)
+          });
+        } catch {}
       }
-    }
 
-    if (!userToSave) {
-      const name = (loginNameInput || "").trim();
-      if (!name) return;
-
-      const newId = uid();
-      userToSave = { id: newId, name, role: loginRoleSelect };
-
-      setEmployees(prev => [...prev, userToSave]);
-      try {
-        await fetch("/api/employees", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(userToSave)
-        });
-      } catch (e) {}
-    }
-
-    if (userToSave) {
-      setCurrentUser(userToSave);
-      try {
-        localStorage.setItem("adm-current-user", JSON.stringify(userToSave));
-      } catch (e) {}
+      setCurrentUser(userObj);
+      try { localStorage.setItem("adm-user", JSON.stringify(userObj)); } catch {}
+    } catch (err) {
+      setLoginError(err.message);
+    } finally {
+      setLoginLoading(false);
     }
   };
 
   const handleLogout = () => {
     setCurrentUser(null);
-    try {
-      localStorage.removeItem("adm-current-user");
-    } catch (e) {}
+    setLoginStep("form"); setLoginName(""); setLoginEmail(""); setLoginRole(DEFAULT_ROLES[0]);
+    setOtp(""); setLoginError(""); setLoginSuccess("");
+    try { localStorage.removeItem("adm-user"); } catch {}
   };
 
-  // Add Employee
-  const addEmployee = async () => {
-    const name = newEmpName.trim();
-    if (!name) return;
-
-    let roleToSave = selectedRole;
-    if (showCustomRole) {
-      const custom = customRoleInput.trim();
-      if (!custom) return;
-      roleToSave = custom;
-      
-      try {
-        await fetch("/api/roles", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ title: custom })
-        });
-        if (!rolesList.includes(custom)) {
-          setRolesList(prev => [...prev, custom]);
-        }
-      } catch (e) {}
-    }
-
-    const newEmp = { id: uid(), name, role: roleToSave };
-    setEmployees((prev) => [...prev, newEmp]);
-    setNewEmpName("");
-    setCustomRoleInput("");
-    setShowCustomRole(false);
-
-    try {
-      const res = await fetch("/api/employees", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(newEmp)
-      });
-      const data = await res.json();
-      if (!data.success) throw new Error(data.error);
-      fetchData(false);
-    } catch (e) {
-      setSaveError(true);
-      setSaveErrorMessage("Failed to save employee.");
-    }
-  };
-
-  const removeEmployee = async (id) => {
-    setEmployees((prev) => prev.filter((e) => e.id !== id));
-
-    try {
-      const res = await fetch(`/api/employees/${id}`, { method: "DELETE" });
-      const data = await res.json();
-      if (!data.success) throw new Error(data.error);
-      fetchData(false);
-    } catch (e) {
-      setSaveError(true);
-      setSaveErrorMessage("Failed to remove employee.");
-    }
-  };
-
+  // ── Attendance handlers ─────────────────────────────────────────────────────
   const setStatus = async (empId, dateStr, status, site) => {
     const key = `${empId}__${dateStr}`;
-    const nextAtt = { ...attendance };
-    const currentSite = site !== undefined ? site : (nextAtt[key]?.site || "");
-
-    if (status === null) {
-      delete nextAtt[key];
-    } else {
-      nextAtt[key] = { status, site: currentSite };
-    }
-
-    setAttendance(nextAtt);
-
+    const next = { ...attendance };
+    const curSite = site !== undefined ? site : (next[key]?.site || "");
+    if (status === null) delete next[key];
+    else next[key] = { status, site: curSite };
+    setAttendance(next);
     try {
       const res = await fetch("/api/attendance", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: key, empId, dateStr, status, site: currentSite })
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: key, empId, dateStr, status, site: curSite })
       });
-      const data = await res.json();
-      if (!data.success) throw new Error(data.error);
+      const d = await res.json();
+      if (!d.success) throw new Error(d.error);
       fetchData(false);
-    } catch (e) {
-      setSaveError(true);
-      setSaveErrorMessage("Failed to sync attendance.");
-    }
-  };
-
-  const markAllPresent = async () => {
-    const dateStr = fmtDate(selectedDate);
-    const nextAtt = { ...attendance };
-
-    employees.forEach(emp => {
-      const key = `${emp.id}__${dateStr}`;
-      nextAtt[key] = { status: "present", site: nextAtt[key]?.site || "" };
-    });
-
-    setAttendance(nextAtt);
-
-    try {
-      const res = await fetch("/api/mark-all-present", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ dateStr })
-      });
-      const data = await res.json();
-      if (!data.success) throw new Error(data.error);
-      fetchData(false);
-    } catch (e) {
-      setSaveError(true);
-      setSaveErrorMessage("Failed to mark all present.");
-    }
+    } catch (err) { setAppError("Sync error: " + err.message); }
   };
 
   const cycleStatus = (empId, dateStr) => {
     const key = `${empId}__${dateStr}`;
-    const current = attendance[key]?.status ?? null;
-    const idx = STATUS_CYCLE.indexOf(current);
-    const nextStatus = STATUS_CYCLE[(idx + 1) % STATUS_CYCLE.length];
-    setStatus(empId, dateStr, nextStatus);
+    const cur = attendance[key]?.status ?? null;
+    const idx = STATUS_CYCLE.indexOf(cur);
+    setStatus(empId, dateStr, STATUS_CYCLE[(idx + 1) % STATUS_CYCLE.length]);
   };
 
-  const clearAllData = async () => {
-    setEmployees([]);
-    setAttendance({});
-    setConfirmClear(false);
-
+  const markAllPresent = async () => {
+    const dateStr = fmtDate(selectedDate);
+    const next = { ...attendance };
+    employees.forEach(emp => { next[`${emp.id}__${dateStr}`] = { status: "present", site: next[`${emp.id}__${dateStr}`]?.site || "" }; });
+    setAttendance(next);
     try {
-      const res = await fetch("/api/clear-all", { method: "POST" });
-      const data = await res.json();
-      if (!data.success) throw new Error(data.error);
+      await fetch("/api/mark-all-present", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ dateStr }) });
       fetchData(false);
-    } catch (e) {
-      setSaveError(true);
-      setSaveErrorMessage("Failed to clear database.");
-    }
+    } catch {}
   };
 
+  // ── Employee handlers ───────────────────────────────────────────────────────
+  const addEmployee = async () => {
+    if (!newEmpName.trim()) return;
+    const emp = { id: uid(), name: newEmpName.trim(), email: newEmpEmail.trim(), role: newEmpRole };
+    setEmployees(prev => [...prev, emp]);
+    setNewEmpName(""); setNewEmpEmail("");
+    try {
+      await fetch("/api/employees", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(emp) });
+      fetchData(false);
+    } catch (err) { setAppError("Failed to save employee."); }
+  };
+
+  const removeEmployee = async (id) => {
+    setEmployees(prev => prev.filter(e => e.id !== id));
+    try {
+      await fetch(`/api/employees/${id}`, { method: "DELETE" });
+      fetchData(false);
+    } catch {}
+  };
+
+  const clearAll = async () => {
+    setEmployees([]); setAttendance({}); setConfirmClear(false);
+    try { await fetch("/api/clear-all", { method: "POST" }); fetchData(false); } catch {}
+  };
+
+  // ── Computed values ─────────────────────────────────────────────────────────
   const selectedDateStr = fmtDate(selectedDate);
 
   const todayStats = useMemo(() => {
     let present = 0, absent = 0, leave = 0, half = 0, marked = 0;
     employees.forEach(emp => {
-      const rec = attendance[`${emp.id}__${selectedDateStr}`];
-      if (rec) {
-        marked++;
-        if (rec.status === "present") present++;
-        else if (rec.status === "absent") absent++;
-        else if (rec.status === "leave") leave++;
-        else if (rec.status === "half") half++;
-      }
+      const r = attendance[`${emp.id}__${selectedDateStr}`];
+      if (r) { marked++; if (r.status==="present") present++; else if (r.status==="absent") absent++; else if (r.status==="leave") leave++; else if (r.status==="half") half++; }
     });
     const total = employees.length;
-    const pct = total > 0 ? Math.round((marked / total) * 100) : 0;
-    return { present, absent, leave, half, marked, total, pct };
+    return { present, absent, leave, half, marked, total, pct: total > 0 ? Math.round((marked/total)*100) : 0 };
   }, [attendance, employees, selectedDateStr]);
 
   const filteredEmployees = useMemo(() => {
     if (filterStatus === "all") return employees;
     return employees.filter(emp => {
-      const rec = attendance[`${emp.id}__${selectedDateStr}`];
-      if (filterStatus === "unmarked") return !rec;
-      return rec?.status === filterStatus;
+      const r = attendance[`${emp.id}__${selectedDateStr}`];
+      if (filterStatus === "unmarked") return !r;
+      return r?.status === filterStatus;
     });
   }, [employees, attendance, selectedDateStr, filterStatus]);
 
   const monthDays = useMemo(() => {
-    const y = registerMonth.getFullYear();
-    const m = registerMonth.getMonth();
-    const count = new Date(y, m + 1, 0).getDate();
+    const count = new Date(registerMonth.getFullYear(), registerMonth.getMonth() + 1, 0).getDate();
     return Array.from({ length: count }, (_, i) => i + 1);
   }, [registerMonth]);
 
   const monthStats = useMemo(() => {
-    const y = registerMonth.getFullYear();
-    const m = registerMonth.getMonth();
+    const y = registerMonth.getFullYear(), m = registerMonth.getMonth();
     const stats = {};
-    employees.forEach((emp) => {
+    employees.forEach(emp => {
       let present = 0, marked = 0;
-      monthDays.forEach((day) => {
-        const ds = fmtDate(new Date(y, m, day));
-        const rec = attendance[`${emp.id}__${ds}`];
-        if (rec) {
-          marked += 1;
-          if (rec.status === "present" || rec.status === "half") present += rec.status === "half" ? 0.5 : 1;
-        }
+      monthDays.forEach(day => {
+        const r = attendance[`${emp.id}__${fmtDate(new Date(y,m,day))}`];
+        if (r) { marked++; present += r.status==="present" ? 1 : r.status==="half" ? 0.5 : 0; }
       });
-      stats[emp.id] = marked ? Math.round((present / marked) * 100) : null;
+      stats[emp.id] = marked ? Math.round((present/marked)*100) : null;
     });
     return stats;
   }, [attendance, employees, monthDays, registerMonth]);
 
-  const exportMonthlyRegister = () => {
-    const y = registerMonth.getFullYear();
-    const m = registerMonth.getMonth();
-    const monthName = monthLabel(registerMonth);
-
-    const header = ["Employee", "Role", ...monthDays.map((d) => String(d)), "Present %"];
-    const rows = employees.map((emp) => {
-      const cells = monthDays.map((day) => {
-        const ds = fmtDate(new Date(y, m, day));
-        const rec = attendance[`${emp.id}__${ds}`];
-        return rec ? STATUS[rec.status].short : "";
-      });
+  // ── Export ─────────────────────────────────────────────────────────────────
+  const exportMonthly = () => {
+    const y = registerMonth.getFullYear(), m = registerMonth.getMonth();
+    const mn = monthLabel(registerMonth);
+    const header = ["Employee","Role",...monthDays.map(d=>String(d)),"Present %"];
+    const rows = employees.map(emp => {
+      const cells = monthDays.map(day => { const r = attendance[`${emp.id}__${fmtDate(new Date(y,m,day))}`]; return r ? STATUS[r.status].short : ""; });
       const pct = monthStats[emp.id];
-      return [emp.name, emp.role, ...cells, pct == null ? "" : `${pct}%`];
+      return [emp.name, emp.role, ...cells, pct==null ? "" : `${pct}%`];
     });
-
-    const wsData = [
-      [`Monthly Attendance Register — ${monthName}`],
-      [],
-      header,
-      ...rows,
-    ];
-    const ws = XLSX.utils.aoa_to_sheet(wsData);
-    ws["!cols"] = [{ wch: 22 }, { wch: 16 }, ...monthDays.map(() => ({ wch: 4 })), { wch: 10 }];
-    ws["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: header.length - 1 } }];
-
-    const legendData = [
-      ["Code", "Meaning"],
-      ...Object.values(STATUS).map((s) => [s.short, s.label]),
-    ];
-    const wsLegend = XLSX.utils.aoa_to_sheet(legendData);
-    wsLegend["!cols"] = [{ wch: 8 }, { wch: 16 }];
-
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Register");
-    XLSX.utils.book_append_sheet(wb, wsLegend, "Legend");
-
-    const fname = `Attendance_Register_${monthName.replace(" ", "_")}.xlsx`;
-    XLSX.writeFile(wb, fname);
-    setExportNote(`Downloaded ${fname}`);
-    setTimeout(() => setExportNote(""), 4000);
+    const ws = XLSX.utils.aoa_to_sheet([[`Attendance Register — ${mn}`],[],header,...rows]);
+    ws["!cols"] = [{wch:22},{wch:16},...monthDays.map(()=>({wch:4})),{wch:10}];
+    ws["!merges"] = [{s:{r:0,c:0},e:{r:0,c:header.length-1}}];
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,"Register");
+    XLSX.writeFile(wb,`Attendance_${mn.replace(" ","_")}.xlsx`);
+    setExportNote("Downloaded!"); setTimeout(()=>setExportNote(""),3000);
   };
 
-  const exportClientWiseReport = () => {
-    const y = registerMonth.getFullYear();
-    const m = registerMonth.getMonth();
-    const monthName = monthLabel(registerMonth);
-
+  const exportClientReport = () => {
+    const y = registerMonth.getFullYear(), m = registerMonth.getMonth();
+    const mn = monthLabel(registerMonth);
     const byClient = {};
-    employees.forEach((emp) => {
-      monthDays.forEach((day) => {
-        const ds = fmtDate(new Date(y, m, day));
-        const rec = attendance[`${emp.id}__${ds}`];
-        if (rec && rec.status === "present" && isClientSite(rec.site)) {
-          const client = rec.site.trim();
-          if (!byClient[client]) byClient[client] = [];
-          byClient[client].push({ date: ds, employee: emp.name, role: emp.role });
+    employees.forEach(emp => {
+      monthDays.forEach(day => {
+        const ds = fmtDate(new Date(y,m,day));
+        const r = attendance[`${emp.id}__${ds}`];
+        if (r?.status==="present" && isClientSite(r.site)) {
+          const cl = r.site.trim();
+          if (!byClient[cl]) byClient[cl] = [];
+          byClient[cl].push({date:ds,employee:emp.name,role:emp.role});
         }
       });
     });
-
-    const clientNames = Object.keys(byClient).sort((a, b) => a.localeCompare(b));
-
-    if (clientNames.length === 0) {
-      setExportNote("No client-site attendance found for this month.");
-      setTimeout(() => setExportNote(""), 4000);
-      return;
-    }
-
-    const wb = XLSX.utils.book_new();
-    const usedNames = new Set();
-
-    const summaryRows = clientNames.map((c) => {
-      const entries = byClient[c];
-      const uniqueEmps = new Set(entries.map((e) => e.employee));
-      return [c, entries.length, uniqueEmps.size];
+    const clients = Object.keys(byClient).sort();
+    if (!clients.length) { setExportNote("No client-site attendance found."); setTimeout(()=>setExportNote(""),3000); return; }
+    const wb = XLSX.utils.book_new(); const used = new Set();
+    const sumRows = clients.map(c=>{ const e=byClient[c]; return [c,e.length,new Set(e.map(x=>x.employee)).size]; });
+    const ws0 = XLSX.utils.aoa_to_sheet([[`Client Report — ${mn}`],[],["Client","Days","Employees"],...sumRows]);
+    ws0["!cols"] = [{wch:26},{wch:12},{wch:14}]; XLSX.utils.book_append_sheet(wb,ws0,safeSheetName("Summary",used));
+    clients.forEach(cl => {
+      const rows = byClient[cl].sort((a,b)=>a.date.localeCompare(b.date));
+      const ws = XLSX.utils.aoa_to_sheet([[cl],[],["Date","Employee","Role"],...rows.map(e=>[e.date,e.employee,e.role])]);
+      ws["!cols"] = [{wch:14},{wch:22},{wch:16}]; XLSX.utils.book_append_sheet(wb,ws,safeSheetName(cl,used));
     });
-    const wsSummary = XLSX.utils.aoa_to_sheet([
-      [`Client-wise Attendance Summary — ${monthName}`],
-      [],
-      ["Client", "Total Attendance-Days", "Employees Involved"],
-      ...summaryRows,
-    ]);
-    wsSummary["!cols"] = [{ wch: 26 }, { wch: 20 }, { wch: 18 }];
-    wsSummary["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 2 } }];
-    XLSX.utils.book_append_sheet(wb, wsSummary, safeSheetName("Summary", usedNames));
-
-    clientNames.forEach((client) => {
-      const entries = byClient[client].sort((a, b) => a.date.localeCompare(b.date) || a.employee.localeCompare(b.employee));
-      const wsData = [
-        [client],
-        [],
-        ["Date", "Employee", "Role"],
-        ...entries.map((e) => [e.date, e.employee, e.role]),
-      ];
-      const ws = XLSX.utils.aoa_to_sheet(wsData);
-      ws["!cols"] = [{ wch: 14 }, { wch: 22 }, { wch: 16 }];
-      ws["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 2 } }];
-      XLSX.utils.book_append_sheet(wb, ws, safeSheetName(client, usedNames));
-    });
-
-    const fname = `Client_Wise_Report_${monthName.replace(" ", "_")}.xlsx`;
-    XLSX.writeFile(wb, fname);
-    setExportNote(`Downloaded ${fname} (${clientNames.length} client${clientNames.length === 1 ? "" : "s"})`);
-    setTimeout(() => setExportNote(""), 4000);
+    XLSX.writeFile(wb,`Client_Report_${mn.replace(" ","_")}.xlsx`);
+    setExportNote(`Downloaded (${clients.length} clients)`); setTimeout(()=>setExportNote(""),3000);
   };
 
-  if (loading) {
+  // ── Loading splash ─────────────────────────────────────────────────────────
+  if (loading && !currentUser) {
     return (
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100vh" }}>
-        <Loader2 size={28} style={{ animation: "spin 1s linear infinite", marginBottom: 12, color: "#0f172a" }} />
-        <span style={{ fontSize: 14, color: "#64748b", fontWeight: 600 }}>Opening Attendance Tracker...</span>
-      </div>
-    );
-  }
-
-  // LOGIN SCREEN (if not logged in)
-  if (!currentUser) {
-    return (
-      <div className="login-screen-wrapper">
-        <div className="login-card">
-          <img src="/Logo.png" alt="App Logo" className="login-logo" />
-          <h2 className="login-title">Attendance Tracker</h2>
-          <p className="login-subtitle">Select your profile or register to sign in</p>
-
-          <form onSubmit={handleLoginSubmit}>
-            <div className="login-form-group">
-              {employees.length > 0 && !isNewLoginUser ? (
-                <>
-                  <label className="form-label">Select Employee Profile</label>
-                  <select
-                    className="select-box"
-                    value={loginEmpId}
-                    onChange={(e) => {
-                      if (e.target.value === "__NEW_USER__") {
-                        setIsNewLoginUser(true);
-                      } else {
-                        setLoginEmpId(e.target.value);
-                      }
-                    }}
-                  >
-                    <option value="">-- Select Your Name --</option>
-                    {employees.map((emp) => (
-                      <option key={emp.id} value={emp.id}>
-                        {emp.name} — {emp.role}
-                      </option>
-                    ))}
-                    <option value="__NEW_USER__">+ Register as New User...</option>
-                  </select>
-                </>
-              ) : (
-                <>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <label className="form-label">Your Full Name</label>
-                    {employees.length > 0 && (
-                      <button
-                        type="button"
-                        style={{ background: "none", border: "none", color: "#64748b", fontSize: 11, fontWeight: 600, cursor: "pointer", textDecoration: "underline" }}
-                        onClick={() => setIsNewLoginUser(false)}
-                      >
-                        Select existing profile
-                      </button>
-                    )}
-                  </div>
-                  <input
-                    className="input-box"
-                    placeholder="Enter your name (e.g. Hassan)"
-                    value={loginNameInput}
-                    onChange={(e) => setLoginNameInput(e.target.value)}
-                    required
-                  />
-
-                  {/* Custom Rounded Role Chip Selector Grid */}
-                  <label className="form-label">Select Your Role</label>
-                  <div className="role-picker-grid">
-                    {rolesList.map((r) => (
-                      <button
-                        key={r}
-                        type="button"
-                        className={`role-chip-btn ${loginRoleSelect === r ? "active" : ""}`}
-                        onClick={() => setLoginRoleSelect(r)}
-                      >
-                        {r}
-                      </button>
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
-
-            <button type="submit" className="btn-charcoal-login">
-              Continue to App <ArrowRight size={16} />
-            </button>
-          </form>
+      <div className="splash">
+        <div className="splash-inner">
+          <img src="/Logo.png" alt="Logo" className="splash-logo" />
+          <Loader2 size={20} className="spinner" />
+          <span>Loading...</span>
         </div>
       </div>
     );
   }
 
-  // MAIN DASHBOARD (When Logged In)
-  return (
-    <div className="app-container">
-      
-      {/* Sticky Top Header */}
-      <header className="top-header">
-        <div className="header-inner">
-          <div className="header-brand">
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <img src="/Logo.png" alt="Logo" className="header-logo-circle" />
-              <h1>Attendance Tracker</h1>
-            </div>
+  // ── Login / Verify Screen ──────────────────────────────────────────────────
+  if (!currentUser) {
+    return (
+      <div className="auth-wrapper">
+        {/* Left panel (decorative) */}
+        <div className="auth-left">
+          <img src="/Logo.png" alt="Logo" className="auth-brand-logo" />
+          <h1 className="auth-brand-name">Attendance<br/>Tracker</h1>
+          <p className="auth-brand-sub">Simple. Fast. Reliable.</p>
+          <div className="auth-dots">
+            <span/><span/><span/>
+          </div>
+        </div>
 
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <div className="user-session-badge">
-                <span>{currentUser.name} ({currentUser.role})</span>
-                <button className="btn-switch-user" title="Switch User" onClick={handleLogout}>
-                  Switch
-                </button>
+        {/* Right panel (form) */}
+        <div className="auth-right">
+          <div className="auth-card">
+            {loginStep === "form" ? (
+              <>
+                <div className="auth-header">
+                  <h2>Welcome 👋</h2>
+                  <p>Enter your details to continue</p>
+                </div>
+
+                {loginError && <div className="auth-alert error">{loginError}</div>}
+
+                <form onSubmit={handleSendOtp} className="auth-form">
+                  {/* Name */}
+                  <div className="field-group">
+                    <label>Full Name</label>
+                    <div className="input-wrapper">
+                      <User size={16} className="input-icon" />
+                      <input
+                        className="field-input"
+                        placeholder="e.g. Hassan Ahmed"
+                        value={loginName}
+                        onChange={e => setLoginName(e.target.value)}
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  {/* Email */}
+                  <div className="field-group">
+                    <label>Email Address</label>
+                    <div className="input-wrapper">
+                      <Mail size={16} className="input-icon" />
+                      <input
+                        className="field-input"
+                        type="email"
+                        placeholder="e.g. hassan@company.com"
+                        value={loginEmail}
+                        onChange={e => setLoginEmail(e.target.value)}
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  {/* Role Grid */}
+                  <div className="field-group">
+                    <label>Select Your Role</label>
+                    <div className="role-grid">
+                      {rolesList.map(r => (
+                        <button
+                          key={r}
+                          type="button"
+                          className={`role-tile ${loginRole === r ? "active" : ""}`}
+                          onClick={() => setLoginRole(r)}
+                        >
+                          <span className="role-icon">{ROLE_ICONS[r] || "👤"}</span>
+                          <span className="role-label">{r}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <button type="submit" className="btn-primary" disabled={loginLoading}>
+                    {loginLoading ? <Loader2 size={16} className="spinner" /> : <><span>Send Verification Code</span> <ArrowRight size={16} /></>}
+                  </button>
+                </form>
+              </>
+            ) : (
+              <>
+                <div className="auth-header">
+                  <h2>Check your inbox ✉️</h2>
+                  <p>We sent a 6-digit code to<br/><strong>{loginEmail}</strong></p>
+                </div>
+
+                {loginError && <div className="auth-alert error">{loginError}</div>}
+                {loginSuccess && <div className="auth-alert success">{loginSuccess}</div>}
+
+                <form onSubmit={handleVerifyOtp} className="auth-form">
+                  <OtpInput value={otp} onChange={setOtp} />
+
+                  <button type="submit" className="btn-primary" disabled={loginLoading || otp.replace(/\D/g,"").length < 6}>
+                    {loginLoading ? <Loader2 size={16} className="spinner" /> : <><span>Verify & Continue</span> <ArrowRight size={16} /></>}
+                  </button>
+
+                  <div className="otp-footer">
+                    <button
+                      type="button"
+                      className="btn-ghost"
+                      onClick={() => { setLoginStep("form"); setOtp(""); setLoginError(""); setLoginSuccess(""); }}
+                    >
+                      ← Back
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-ghost"
+                      disabled={resendCooldown > 0}
+                      onClick={handleSendOtp}
+                    >
+                      {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : "Resend Code"}
+                    </button>
+                  </div>
+                </form>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Main Dashboard ─────────────────────────────────────────────────────────
+  return (
+    <div className="app">
+
+      {/* Top Bar */}
+      <header className="topbar">
+        <div className="topbar-inner">
+          <div className="topbar-left">
+            <img src="/Logo.png" alt="Logo" className="topbar-logo" />
+            <span className="topbar-title">Attendance Tracker</span>
+          </div>
+          <div className="topbar-right">
+            <div className="user-pill">
+              <div className="user-avatar">{currentUser.name.charAt(0).toUpperCase()}</div>
+              <div className="user-info">
+                <span className="user-name">{currentUser.name}</span>
+                <span className="user-role">{currentUser.role}</span>
               </div>
+              <button className="logout-btn" onClick={handleLogout} title="Sign out">
+                <LogOut size={14} />
+              </button>
             </div>
           </div>
+        </div>
 
-          {/* Nav Pills */}
-          <nav className="segmented-nav">
-            <button className={`nav-pill ${tab === "today" ? "active" : ""}`} onClick={() => setTab("today")}>
-              <CalendarDays size={16} /> Mark Attendance
-            </button>
-            <button className={`nav-pill ${tab === "register" ? "active" : ""}`} onClick={() => setTab("register")}>
-              <BookOpen size={16} /> Monthly Register
-            </button>
-            <button className={`nav-pill ${tab === "employees" ? "active" : ""}`} onClick={() => setTab("employees")}>
-              <Users size={16} /> Employees
-            </button>
-          </nav>
+        {/* Navigation */}
+        <div className="nav-bar">
+          <button className={`nav-btn ${tab==="today"?"active":""}`} onClick={()=>setTab("today")}>
+            <CalendarDays size={15} /> Today
+          </button>
+          <button className={`nav-btn ${tab==="register"?"active":""}`} onClick={()=>setTab("register")}>
+            <BookOpen size={15} /> Register
+          </button>
+          <button className={`nav-btn ${tab==="employees"?"active":""}`} onClick={()=>setTab("employees")}>
+            <Users size={15} /> Employees
+          </button>
         </div>
       </header>
 
-      {/* Main Content Area */}
-      <main className="main-content" key={tab}>
-        {saveError && (
-          <div style={{ background: "#ffffff", border: "1px solid #cbd5e1", color: "#334155", padding: "12px 16px", borderRadius: 12, marginBottom: 20, fontSize: 13, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <AlertCircle size={16} />
-              <span>{saveErrorMessage}</span>
-            </div>
-            <button onClick={() => setSaveError(false)} style={{ background: "none", border: "none", cursor: "pointer", fontWeight: "bold", color: "#334155" }}>✕</button>
+      {/* Content */}
+      <main className="content">
+        {appError && (
+          <div className="app-alert">
+            <AlertCircle size={15} />
+            <span>{appError}</span>
+            <button onClick={()=>setAppError("")}><X size={13}/></button>
           </div>
         )}
 
-        {/* Tab 1: Mark Attendance */}
+        {/* ── TODAY TAB ─────────────────────────────────────────────────── */}
         {tab === "today" && (
-          <div>
-            {/* Date Navigator */}
-            <div className="date-bar">
-              <div className="date-selector">
-                <button className="icon-btn" onClick={() => setSelectedDate(new Date(selectedDate.getTime() - 86400000))}>
-                  <ChevronLeft size={18} />
-                </button>
-                <span className="date-text">
-                  {selectedDate.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })}
-                </span>
-                <button className="icon-btn" onClick={() => setSelectedDate(new Date(selectedDate.getTime() + 86400000))}>
-                  <ChevronRight size={18} />
-                </button>
+          <>
+            {/* Date selector */}
+            <div className="card date-nav">
+              <button className="icon-btn" onClick={()=>setSelectedDate(new Date(selectedDate.getTime()-86400000))}><ChevronLeft size={16}/></button>
+              <div className="date-center">
+                <span className="date-main">{selectedDate.toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"})}</span>
+                <span className="date-year">{selectedDate.getFullYear()}</span>
               </div>
-
-              <button className="today-btn" onClick={() => setSelectedDate(new Date())}>
-                Today
-              </button>
+              <button className="icon-btn" onClick={()=>setSelectedDate(new Date(selectedDate.getTime()+86400000))}><ChevronRight size={16}/></button>
+              <button className="chip-btn" onClick={()=>setSelectedDate(new Date())}>Today</button>
             </div>
 
-            {/* Attendance Progress Meter & 1-Tap Mark All */}
+            {/* Stats */}
             {employees.length > 0 && (
-              <div className="summary-meter-card">
-                <div className="meter-header">
-                  <span className="meter-title">Today's Team Progress</span>
-                  <span className="meter-stat">{todayStats.marked} / {todayStats.total} Marked ({todayStats.pct}%)</span>
+              <div className="card stats-card">
+                <div className="stats-row">
+                  <div className="stat-item">
+                    <span className="stat-num" style={{color:"#16a34a"}}>{todayStats.present}</span>
+                    <span className="stat-lbl">Present</span>
+                  </div>
+                  <div className="stat-item">
+                    <span className="stat-num" style={{color:"#334155"}}>{todayStats.absent}</span>
+                    <span className="stat-lbl">Absent</span>
+                  </div>
+                  <div className="stat-item">
+                    <span className="stat-num" style={{color:"#d97706"}}>{todayStats.leave}</span>
+                    <span className="stat-lbl">Leave</span>
+                  </div>
+                  <div className="stat-item">
+                    <span className="stat-num" style={{color:"#6366f1"}}>{todayStats.half}</span>
+                    <span className="stat-lbl">Half</span>
+                  </div>
+                  <div className="stat-item">
+                    <span className="stat-num">{todayStats.pct}%</span>
+                    <span className="stat-lbl">Marked</span>
+                  </div>
                 </div>
-
-                <div className="progress-bar-bg">
-                  <div className="progress-fill-present" style={{ width: `${(todayStats.present / (todayStats.total || 1)) * 100}%` }} title={`Present: ${todayStats.present}`} />
-                  <div className="progress-fill-absent" style={{ width: `${(todayStats.absent / (todayStats.total || 1)) * 100}%` }} title={`Absent: ${todayStats.absent}`} />
-                  <div className="progress-fill-leave" style={{ width: `${(todayStats.leave / (todayStats.total || 1)) * 100}%` }} title={`Leave: ${todayStats.leave}`} />
-                  <div className="progress-fill-half" style={{ width: `${(todayStats.half / (todayStats.total || 1)) * 100}%` }} title={`Half Day: ${todayStats.half}`} />
+                <div className="progress-track">
+                  <div className="progress-seg" style={{width:`${(todayStats.present/(todayStats.total||1))*100}%`,background:"#16a34a"}}/>
+                  <div className="progress-seg" style={{width:`${(todayStats.absent/(todayStats.total||1))*100}%`,background:"#334155"}}/>
+                  <div className="progress-seg" style={{width:`${(todayStats.leave/(todayStats.total||1))*100}%`,background:"#d97706"}}/>
+                  <div className="progress-seg" style={{width:`${(todayStats.half/(todayStats.total||1))*100}%`,background:"#6366f1"}}/>
                 </div>
-
-                <div className="quick-actions-bar">
-                  <button className="btn-mark-all" onClick={markAllPresent}>
-                    <CheckCheck size={16} /> Mark All Present
-                  </button>
-
-                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                    {["all", "unmarked", "present", "absent"].map((st) => (
-                      <button
-                        key={st}
-                        style={{
-                          fontSize: 12,
-                          fontWeight: 600,
-                          padding: "4px 10px",
-                          borderRadius: 8,
-                          border: "1px solid #e2e8f0",
-                          background: filterStatus === st ? "#0f172a" : "#ffffff",
-                          color: filterStatus === st ? "#ffffff" : "#64748b",
-                          cursor: "pointer",
-                          textTransform: "capitalize"
-                        }}
-                        onClick={() => setFilterStatus(st)}
-                      >
-                        {st}
+                <div className="stats-actions">
+                  <button className="btn-mark-all" onClick={markAllPresent}><CheckCheck size={14}/> Mark All Present</button>
+                  <div className="filter-pills">
+                    {["all","unmarked","present","absent","leave"].map(f=>(
+                      <button key={f} className={`filter-pill ${filterStatus===f?"active":""}`} onClick={()=>setFilterStatus(f)}>
+                        {f.charAt(0).toUpperCase()+f.slice(1)}
                       </button>
                     ))}
                   </div>
@@ -716,99 +642,57 @@ export default function AttendanceTracker() {
               </div>
             )}
 
-            {/* Quick Add Employee Card if no employees */}
+            {/* Employee cards */}
             {employees.length === 0 ? (
-              <div className="add-emp-card" style={{ textAlign: "center", padding: "36px 20px" }}>
-                <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 6, color: "#0f172a" }}>No Employees Added Yet</div>
-                <div style={{ fontSize: 13, color: "#64748b", marginBottom: 20 }}>Select a role and add team members to start marking attendance</div>
-
-                <div className="add-emp-grid" style={{ maxWidth: 650, margin: "0 auto" }}>
-                  <input
-                    className="input-box"
-                    placeholder="Employee name (e.g. Hassan)"
-                    value={newEmpName}
-                    onChange={(e) => setNewEmpName(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && addEmployee()}
-                  />
-
-                  <div>
-                    <label className="form-label" style={{ display: "block", textAlign: "left", marginBottom: 6 }}>Select Role</label>
-                    <div className="role-picker-grid" style={{ justifyContent: "center" }}>
-                      {rolesList.map((r) => (
-                        <button
-                          key={r}
-                          type="button"
-                          className={`role-chip-btn ${selectedRole === r ? "active" : ""}`}
-                          onClick={() => setSelectedRole(r)}
-                        >
-                          {r}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <button className="primary-add-btn" onClick={addEmployee}>
-                    <Plus size={18} /> Add Employee
-                  </button>
-                </div>
+              <div className="card empty-state">
+                <div className="empty-icon">👥</div>
+                <h3>No employees yet</h3>
+                <p>Go to the Employees tab to add your team</p>
               </div>
             ) : (
-              filteredEmployees.map((emp) => {
+              filteredEmployees.map(emp => {
                 const key = `${emp.id}__${selectedDateStr}`;
                 const rec = attendance[key];
-                const currentStatus = rec?.status;
-                const initial = emp.name ? emp.name.charAt(0).toUpperCase() : "?";
-
+                const cur = rec?.status;
                 return (
-                  <div className="emp-item-card" key={emp.id}>
-                    <div className="emp-item-header">
-                      <div className="emp-avatar-group">
-                        <div className="emp-avatar">{initial}</div>
-                        <div>
-                          <div className="emp-name-text">{emp.name}</div>
-                          <span className="emp-role-badge">{emp.role}</span>
-                        </div>
+                  <div className="card emp-card" key={emp.id}>
+                    <div className="emp-top">
+                      <div className="emp-av">{emp.name.charAt(0).toUpperCase()}</div>
+                      <div className="emp-meta">
+                        <span className="emp-name">{emp.name}</span>
+                        <span className="emp-role-tag">{emp.role}</span>
                       </div>
                     </div>
-
-                    {/* Interactive Status Chips */}
-                    <div className="status-chips-grid">
-                      {["present", "absent", "leave", "half"].map((s) => {
+                    <div className="status-row">
+                      {["present","absent","leave","half"].map(s => {
                         const meta = STATUS[s];
-                        const isActive = currentStatus === s;
+                        const active = cur === s;
                         return (
                           <button
                             key={s}
-                            className={`status-chip ${isActive ? `chip-${s}` : ""}`}
-                            onClick={() => setStatus(emp.id, selectedDateStr, isActive ? null : s)}
+                            className={`status-btn ${active ? "status-active" : ""}`}
+                            style={active ? { background: meta.color, borderColor: meta.color, color: "#fff" } : {}}
+                            onClick={() => setStatus(emp.id, selectedDateStr, active ? null : s)}
                           >
-                            <span>{meta.label}</span>
+                            {meta.label}
                           </button>
                         );
                       })}
                     </div>
-
-                    {/* Site Location Field for Present */}
-                    {currentStatus === "present" && (
-                      <div className="site-input-container">
+                    {cur === "present" && (
+                      <div className="site-row">
                         <input
-                          className="site-field"
-                          placeholder="Office / Client location (optional)"
+                          className="site-input"
+                          placeholder="Location (optional)"
                           value={siteDrafts[key] ?? rec?.site ?? ""}
-                          onChange={(e) => setSiteDrafts({ ...siteDrafts, [key]: e.target.value })}
-                          onBlur={(e) => setStatus(emp.id, selectedDateStr, "present", e.target.value)}
+                          onChange={e => setSiteDrafts({...siteDrafts,[key]:e.target.value})}
+                          onBlur={e => setStatus(emp.id, selectedDateStr, "present", e.target.value)}
                         />
-                        <div className="site-quick-pills">
-                          {["Office / HQ", "Client Site", "Work From Home"].map((siteOpt) => (
-                            <button
-                              key={siteOpt}
-                              className="site-pill"
-                              onClick={() => {
-                                setSiteDrafts({ ...siteDrafts, [key]: siteOpt });
-                                setStatus(emp.id, selectedDateStr, "present", siteOpt);
-                              }}
-                            >
-                              {siteOpt}
+                        <div className="site-chips">
+                          {["Office / HQ","Client Site","Work From Home"].map(opt => (
+                            <button key={opt} className="site-chip"
+                              onClick={() => { setSiteDrafts({...siteDrafts,[key]:opt}); setStatus(emp.id,selectedDateStr,"present",opt); }}>
+                              {opt}
                             </button>
                           ))}
                         </div>
@@ -818,196 +702,138 @@ export default function AttendanceTracker() {
                 );
               })
             )}
-          </div>
+          </>
         )}
 
-        {/* Tab 2: Monthly Register */}
+        {/* ── REGISTER TAB ──────────────────────────────────────────────── */}
         {tab === "register" && (
-          <div>
-            <div className="date-bar">
-              <div className="date-selector">
-                <button className="icon-btn" onClick={() => setRegisterMonth(new Date(registerMonth.getFullYear(), registerMonth.getMonth() - 1, 1))}>
-                  <ChevronLeft size={18} />
-                </button>
-                <span className="date-text">{monthLabel(registerMonth)}</span>
-                <button className="icon-btn" onClick={() => setRegisterMonth(new Date(registerMonth.getFullYear(), registerMonth.getMonth() + 1, 1))}>
-                  <ChevronRight size={18} />
-                </button>
+          <>
+            <div className="card date-nav">
+              <button className="icon-btn" onClick={()=>setRegisterMonth(new Date(registerMonth.getFullYear(),registerMonth.getMonth()-1,1))}><ChevronLeft size={16}/></button>
+              <div className="date-center">
+                <span className="date-main">{monthLabel(registerMonth)}</span>
               </div>
+              <button className="icon-btn" onClick={()=>setRegisterMonth(new Date(registerMonth.getFullYear(),registerMonth.getMonth()+1,1))}><ChevronRight size={16}/></button>
             </div>
 
             <div className="export-row">
-              <button className="export-btn" onClick={exportMonthlyRegister} disabled={employees.length === 0}>
-                <Download size={16} /> Export Monthly Register (Excel)
-              </button>
-              <button className="export-btn" onClick={exportClientWiseReport} disabled={employees.length === 0}>
-                <Building2 size={16} /> Export Client Report (Excel)
-              </button>
-              {exportNote && <span style={{ fontSize: 13, color: "#0f766e", fontWeight: 700, alignSelf: "center" }}>{exportNote}</span>}
+              <button className="btn-outline" onClick={exportMonthly} disabled={!employees.length}><Download size={14}/> Monthly Excel</button>
+              <button className="btn-outline" onClick={exportClientReport} disabled={!employees.length}><Building2 size={14}/> Client Report</button>
+              {exportNote && <span className="export-note">{exportNote}</span>}
             </div>
 
-            <div style={{ display: "flex", gap: 16, marginBottom: 16, flexWrap: "wrap", fontSize: 13, color: "#64748b" }}>
-              {Object.values(STATUS).map((s) => (
-                <div key={s.key} style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 600 }}>
-                  <span style={{ width: 12, height: 12, borderRadius: 4, background: s.color }} />
+            <div className="legend-row">
+              {Object.values(STATUS).map(s => (
+                <div key={s.key} className="legend-item">
+                  <span className="legend-dot" style={{background:s.color}}/>
                   <span>{s.label} ({s.short})</span>
                 </div>
               ))}
             </div>
 
             {employees.length === 0 ? (
-              <div style={{ textAlign: "center", padding: "48px 0", color: "#64748b", fontSize: 14 }}>
-                No employees registered.
-              </div>
+              <div className="card empty-state"><div className="empty-icon">📊</div><h3>No data yet</h3><p>Add employees to see the register</p></div>
             ) : (
-              <div className="table-wrapper">
-                <table className="reg-grid">
-                  <thead>
-                    <tr>
-                      <th className="sticky-name">Employee</th>
-                      {monthDays.map((d) => <th key={d}>{d}</th>)}
-                      <th>%</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {employees.map((emp) => (
-                      <tr key={emp.id}>
-                        <td className="sticky-name">
-                          <div style={{ fontWeight: 700, color: "#0f172a" }}>{emp.name}</div>
-                          <div style={{ fontSize: 11, color: "#64748b" }}>{emp.role}</div>
-                        </td>
-                        {monthDays.map((day) => {
-                          const ds = fmtDate(new Date(registerMonth.getFullYear(), registerMonth.getMonth(), day));
-                          const rec = attendance[`${emp.id}__${ds}`];
-                          const meta = rec ? STATUS[rec.status] : null;
-
-                          return (
-                            <td key={day}>
-                              <div
-                                className={`grid-cell-badge ${meta ? `cell-${meta.short}` : "cell-empty"}`}
-                                title={meta ? `${meta.label}${rec.site ? " — " + rec.site : ""}` : "Not marked"}
-                                onClick={() => cycleStatus(emp.id, ds)}
-                              >
-                                {meta ? meta.short : ""}
-                              </div>
-                            </td>
-                          );
-                        })}
-                        <td>
-                          <span style={{ fontWeight: 700, color: monthStats[emp.id] == null ? "#94a3b8" : "#0f172a" }}>
-                            {monthStats[emp.id] == null ? "—" : `${monthStats[emp.id]}%`}
-                          </span>
-                        </td>
+              <div className="card" style={{padding:0,overflow:"hidden"}}>
+                <div className="table-scroll">
+                  <table className="reg-table">
+                    <thead>
+                      <tr>
+                        <th className="col-sticky">Employee</th>
+                        {monthDays.map(d=><th key={d}>{d}</th>)}
+                        <th>%</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {employees.map(emp => (
+                        <tr key={emp.id}>
+                          <td className="col-sticky">
+                            <div className="reg-name">{emp.name}</div>
+                            <div className="reg-role">{emp.role}</div>
+                          </td>
+                          {monthDays.map(day => {
+                            const ds = fmtDate(new Date(registerMonth.getFullYear(),registerMonth.getMonth(),day));
+                            const r = attendance[`${emp.id}__${ds}`];
+                            const meta = r ? STATUS[r.status] : null;
+                            return (
+                              <td key={day}>
+                                <div
+                                  className="cell-badge"
+                                  style={meta ? {background:meta.color,color:"#fff",borderColor:meta.color} : {}}
+                                  title={meta ? `${meta.label}${r.site?" — "+r.site:""}` : "Not marked"}
+                                  onClick={() => cycleStatus(emp.id, ds)}
+                                >{meta ? meta.short : ""}</div>
+                              </td>
+                            );
+                          })}
+                          <td><span className="pct-badge">{monthStats[emp.id]==null?"—":`${monthStats[emp.id]}%`}</span></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
-          </div>
+          </>
         )}
 
-        {/* Tab 3: Employees Management */}
+        {/* ── EMPLOYEES TAB ─────────────────────────────────────────────── */}
         {tab === "employees" && (
-          <div>
-            {/* Prominent Add Employee Card with Role Selector */}
-            <div className="add-emp-card">
-              <div className="add-emp-title">+ Add New Employee</div>
-              <div className="add-emp-grid">
-                <input
-                  className="input-box"
-                  placeholder="Employee full name (e.g. Hassan)"
-                  value={newEmpName}
-                  onChange={(e) => setNewEmpName(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && addEmployee()}
-                />
-
-                <div>
-                  <label className="form-label" style={{ display: "block", marginBottom: 6 }}>Select Role</label>
-                  <div className="role-picker-grid">
-                    {rolesList.map((r) => (
-                      <button
-                        key={r}
-                        type="button"
-                        className={`role-chip-btn ${selectedRole === r && !showCustomRole ? "active" : ""}`}
-                        onClick={() => {
-                          setShowCustomRole(false);
-                          setSelectedRole(r);
-                        }}
-                      >
-                        {r}
+          <>
+            <div className="card">
+              <h3 className="section-title">Add New Employee</h3>
+              <div className="add-form">
+                <input className="field-input" placeholder="Full name" value={newEmpName} onChange={e=>setNewEmpName(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addEmployee()} />
+                <input className="field-input" placeholder="Email (optional)" value={newEmpEmail} onChange={e=>setNewEmpEmail(e.target.value)} />
+                <div className="field-group" style={{marginBottom:0}}>
+                  <label style={{fontSize:11,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.5px",color:"#64748b",marginBottom:6,display:"block"}}>Role</label>
+                  <div className="role-grid compact">
+                    {rolesList.map(r => (
+                      <button key={r} type="button"
+                        className={`role-tile ${newEmpRole===r?"active":""}`}
+                        onClick={()=>setNewEmpRole(r)}>
+                        <span className="role-icon">{ROLE_ICONS[r]||"👤"}</span>
+                        <span className="role-label">{r}</span>
                       </button>
                     ))}
-                    <button
-                      type="button"
-                      className={`role-chip-btn ${showCustomRole ? "active" : ""}`}
-                      onClick={() => setShowCustomRole(true)}
-                    >
-                      + Custom Role
-                    </button>
                   </div>
                 </div>
-
-                {showCustomRole && (
-                  <input
-                    className="input-box"
-                    placeholder="Enter custom role title..."
-                    value={customRoleInput}
-                    onChange={(e) => setCustomRoleInput(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && addEmployee()}
-                  />
-                )}
-
-                <button className="primary-add-btn" onClick={addEmployee}>
-                  <Plus size={18} /> Add Employee
+                <button className="btn-primary" onClick={addEmployee} disabled={!newEmpName.trim()}>
+                  <Plus size={16}/> Add Employee
                 </button>
               </div>
             </div>
 
-            {/* Employees List */}
             {employees.length === 0 ? (
-              <div style={{ textAlign: "center", padding: "40px 0", color: "#64748b", fontSize: 14 }}>
-                No employees added yet. Use the form above to add your first employee.
-              </div>
+              <div className="card empty-state"><div className="empty-icon">👥</div><h3>No employees yet</h3><p>Add your first team member above</p></div>
             ) : (
-              employees.map((emp) => {
-                const initial = emp.name ? emp.name.charAt(0).toUpperCase() : "?";
-                return (
-                  <div className="emp-item-card" key={emp.id} style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-                    <div className="emp-avatar-group">
-                      <div className="emp-avatar">{initial}</div>
-                      <div>
-                        <div className="emp-name-text">{emp.name}</div>
-                        <span className="emp-role-badge">{emp.role}</span>
-                      </div>
-                    </div>
-
-                    <button className="remove-btn" onClick={() => removeEmployee(emp.id)}>
-                      <Trash2 size={14} /> Remove
-                    </button>
+              employees.map(emp => (
+                <div className="card emp-card" key={emp.id} style={{flexDirection:"row",alignItems:"center",gap:12}}>
+                  <div className="emp-av">{emp.name.charAt(0).toUpperCase()}</div>
+                  <div className="emp-meta" style={{flex:1}}>
+                    <span className="emp-name">{emp.name}</span>
+                    <span className="emp-role-tag">{emp.role}{emp.email&&<> · {emp.email}</>}</span>
                   </div>
-                );
-              })
+                  <button className="btn-danger" onClick={()=>removeEmployee(emp.id)}><Trash2 size={14}/></button>
+                </div>
+              ))
             )}
 
-            <div style={{ marginTop: 40, paddingTop: 20, borderTop: "1px solid #e2e8f0" }}>
+            <div style={{marginTop:32,paddingTop:20,borderTop:"1px solid #f1f5f9"}}>
               {!confirmClear ? (
-                <button className="remove-btn" onClick={() => setConfirmClear(true)}>
-                  <Trash2 size={14} /> Clear all data
-                </button>
+                <button className="btn-ghost-danger" onClick={()=>setConfirmClear(true)}><Trash2 size={13}/> Clear all data</button>
               ) : (
-                <div style={{ fontSize: 13, color: "#334155" }}>
-                  This permanently removes all employees and attendance logs.
-                  <div style={{ marginTop: 12, display: "flex", gap: 10 }}>
-                    <button className="remove-btn" style={{ background: "#334155", color: "#fff", borderColor: "#334155" }} onClick={clearAllData}>Confirm Clear</button>
-                    <button className="today-btn" onClick={() => setConfirmClear(false)}>Cancel</button>
+                <div className="confirm-clear">
+                  <p>This will permanently delete all employees and attendance records.</p>
+                  <div style={{display:"flex",gap:8,marginTop:10}}>
+                    <button className="btn-danger" onClick={clearAll}>Confirm</button>
+                    <button className="btn-ghost" onClick={()=>setConfirmClear(false)}>Cancel</button>
                   </div>
                 </div>
               )}
             </div>
-          </div>
+          </>
         )}
-
       </main>
     </div>
   );

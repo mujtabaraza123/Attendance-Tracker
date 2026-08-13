@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import pkg from 'pg';
+import nodemailer from 'nodemailer';
 import { fileURLToPath } from 'url';
 
 const { Pool } = pkg;
@@ -20,6 +21,18 @@ const pool = new Pool({
   idleTimeoutMillis: 30000,
 });
 
+// In-memory OTP store: { email: { otp, expiresAt } }
+const otpStore = new Map();
+
+// Nodemailer transporter using Gmail App Password
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: 'no.auth.verify@gmail.com',
+    pass: 'yzgl ngmr mqvt rccf',
+  },
+});
+
 // Ensure tables exist on startup
 async function initDb() {
   let client;
@@ -36,9 +49,14 @@ async function initDb() {
       CREATE TABLE IF NOT EXISTS public.employees (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
+        email TEXT DEFAULT '',
         role TEXT NOT NULL DEFAULT 'Staff',
         created_at TIMESTAMPTZ DEFAULT NOW()
       );
+    `);
+    // Add email column if it doesn't exist (migration)
+    await client.query(`
+      ALTER TABLE public.employees ADD COLUMN IF NOT EXISTS email TEXT DEFAULT '';
     `);
     await client.query(`
       CREATE TABLE IF NOT EXISTS public.attendance (
@@ -80,10 +98,71 @@ async function initDb() {
 
 initDb();
 
+// POST /api/send-otp — send OTP to email
+app.post('/api/send-otp', async (req, res) => {
+  const { email, name } = req.body;
+  if (!email) return res.status(400).json({ success: false, error: 'Email is required' });
+
+  const otp = String(Math.floor(100000 + Math.random() * 900000));
+  const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
+
+  otpStore.set(email.toLowerCase().trim(), { otp, expiresAt });
+
+  try {
+    await transporter.sendMail({
+      from: '"Attendance Tracker" <no.auth.verify@gmail.com>',
+      to: email,
+      subject: `Your Verification Code — ${otp}`,
+      html: `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px; background: #f8fafc;">
+          <div style="background: #ffffff; border-radius: 20px; padding: 36px; border: 1px solid #e2e8f0; box-shadow: 0 10px 30px rgba(0,0,0,0.04);">
+            <div style="text-align: center; margin-bottom: 28px;">
+              <div style="display: inline-block; background: #0f172a; color: white; width: 56px; height: 56px; border-radius: 50%; line-height: 56px; font-size: 22px; font-weight: bold; text-align: center;">AT</div>
+              <h2 style="color: #0f172a; margin: 14px 0 4px; font-size: 22px;">Attendance Tracker</h2>
+              <p style="color: #64748b; margin: 0; font-size: 14px;">Email Verification</p>
+            </div>
+            <p style="color: #334155; font-size: 15px; margin-bottom: 6px;">Hi <strong>${name || 'there'}</strong>,</p>
+            <p style="color: #64748b; font-size: 14px; margin-bottom: 28px;">Use this code to verify your account. It expires in <strong>10 minutes</strong>.</p>
+            <div style="text-align: center; margin: 28px 0;">
+              <div style="background: #f8fafc; border: 2px dashed #e2e8f0; border-radius: 16px; padding: 24px; letter-spacing: 12px; font-size: 36px; font-weight: 900; color: #0f172a; font-family: monospace;">${otp}</div>
+            </div>
+            <p style="color: #94a3b8; font-size: 12px; text-align: center; margin: 0;">If you didn't request this, you can safely ignore this email.</p>
+          </div>
+        </div>
+      `,
+    });
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error sending OTP email:', err.message);
+    res.status(500).json({ success: false, error: 'Failed to send email: ' + err.message });
+  }
+});
+
+// POST /api/verify-otp — verify OTP code
+app.post('/api/verify-otp', (req, res) => {
+  const { email, otp } = req.body;
+  if (!email || !otp) return res.status(400).json({ success: false, error: 'Email and OTP required' });
+
+  const key = email.toLowerCase().trim();
+  const record = otpStore.get(key);
+
+  if (!record) return res.json({ success: false, error: 'No OTP found for this email' });
+  if (Date.now() > record.expiresAt) {
+    otpStore.delete(key);
+    return res.json({ success: false, error: 'OTP has expired. Please request a new one.' });
+  }
+  if (record.otp !== String(otp).trim()) {
+    return res.json({ success: false, error: 'Incorrect code. Please try again.' });
+  }
+
+  otpStore.delete(key);
+  res.json({ success: true });
+});
+
 // GET all employees, roles, and attendance records
 app.get('/api/all-data', async (req, res) => {
   try {
-    const empRes = await pool.query(`SELECT id, name, role FROM public.employees ORDER BY created_at ASC;`);
+    const empRes = await pool.query(`SELECT id, name, email, role FROM public.employees ORDER BY created_at ASC;`);
     const roleRes = await pool.query(`SELECT id, title FROM public.roles ORDER BY title ASC;`);
     const attRes = await pool.query(`SELECT id, employee_id, date, status, site FROM public.attendance;`);
     
@@ -106,13 +185,13 @@ app.get('/api/all-data', async (req, res) => {
 
 // POST add employee
 app.post('/api/employees', async (req, res) => {
-  const { id, name, role } = req.body;
+  const { id, name, email, role } = req.body;
   if (!id || !name) return res.status(400).json({ error: "Missing id or name" });
 
   try {
     await pool.query(
-      `INSERT INTO public.employees (id, name, role) VALUES ($1, $2, $3) ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, role = EXCLUDED.role;`,
-      [id, name, role || 'Staff']
+      `INSERT INTO public.employees (id, name, email, role) VALUES ($1, $2, $3, $4) ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, email = EXCLUDED.email, role = EXCLUDED.role;`,
+      [id, name, email || '', role || 'Staff']
     );
     res.json({ success: true });
   } catch (err) {
