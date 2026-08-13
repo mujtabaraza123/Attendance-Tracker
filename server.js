@@ -113,23 +113,7 @@ app.post('/api/send-otp', async (req, res) => {
       from: '"Attendance Tracker" <no.auth.verify@gmail.com>',
       to: email,
       subject: `Your Verification Code — ${otp}`,
-      html: `
-        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px; background: #f8fafc;">
-          <div style="background: #ffffff; border-radius: 20px; padding: 36px; border: 1px solid #e2e8f0; box-shadow: 0 10px 30px rgba(0,0,0,0.04);">
-            <div style="text-align: center; margin-bottom: 28px;">
-              <div style="display: inline-block; background: #0f172a; color: white; width: 56px; height: 56px; border-radius: 50%; line-height: 56px; font-size: 22px; font-weight: bold; text-align: center;">AT</div>
-              <h2 style="color: #0f172a; margin: 14px 0 4px; font-size: 22px;">Attendance Tracker</h2>
-              <p style="color: #64748b; margin: 0; font-size: 14px;">Email Verification</p>
-            </div>
-            <p style="color: #334155; font-size: 15px; margin-bottom: 6px;">Hi <strong>${name || 'there'}</strong>,</p>
-            <p style="color: #64748b; font-size: 14px; margin-bottom: 28px;">Use this code to verify your account. It expires in <strong>10 minutes</strong>.</p>
-            <div style="text-align: center; margin: 28px 0;">
-              <div style="background: #f8fafc; border: 2px dashed #e2e8f0; border-radius: 16px; padding: 24px; letter-spacing: 12px; font-size: 36px; font-weight: 900; color: #0f172a; font-family: monospace;">${otp}</div>
-            </div>
-            <p style="color: #94a3b8; font-size: 12px; text-align: center; margin: 0;">If you didn't request this, you can safely ignore this email.</p>
-          </div>
-        </div>
-      `,
+      html: `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:420px;margin:0 auto;padding:28px 16px;background:#f8fafc;"><div style="background:#ffffff;border-radius:12px;padding:24px;border:1px solid #e2e8f0;"><p style="margin:0 0 4px;font-size:12px;font-weight:700;color:#0f172a;text-transform:uppercase;letter-spacing:0.5px;">Attendance Tracker</p><p style="margin:0 0 16px;font-size:13px;color:#64748b;">Hi ${name || 'there'}, your verification code is:</p><div style="background:#f1f5f9;border-radius:8px;padding:12px 16px;font-size:26px;font-weight:800;letter-spacing:6px;color:#0f172a;font-family:monospace;display:inline-block;">${otp}</div><p style="margin:14px 0 0;font-size:11px;color:#94a3b8;">Expires in 10 minutes. Ignore if you didn't request this.</p></div></div>`,
     });
     res.json({ success: true });
   } catch (err) {
