@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import {
   CalendarDays, BookOpen, Users, ChevronLeft, ChevronRight,
   Plus, Trash2, Download, Building2, CheckCheck, AlertCircle,
-  Loader2, ArrowRight, Mail, User, Briefcase, LogOut, X
+  Loader2, ArrowRight, Mail, User, LogOut, X
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import "./App.css";
@@ -20,11 +20,6 @@ const DEFAULT_ROLES = [
   "Audit Associate", "Senior Associate", "Assistant Manager",
   "Manager", "Partner", "Trainee", "Staff"
 ];
-
-const ROLE_ICONS = {
-  "Audit Associate": "🔍", "Senior Associate": "⭐", "Assistant Manager": "📋",
-  "Manager": "💼", "Partner": "🤝", "Trainee": "📚", "Staff": "👤"
-};
 
 function fmtDate(d) {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
@@ -44,7 +39,7 @@ function safeSheetName(name, used) {
   used.add(c.toLowerCase()); return c;
 }
 
-// ── OTP Input Component (6 individual boxes) ─────────────────────────────────
+// ── OTP Input Component ───────────────────────────────────────────────────────
 function OtpInput({ value, onChange }) {
   const inputs = useRef([]);
   const digits = value.split("").concat(Array(6).fill("")).slice(0, 6);
@@ -92,13 +87,11 @@ function OtpInput({ value, onChange }) {
 
 // ── Main App ──────────────────────────────────────────────────────────────────
 export default function App() {
-  // Auth state
   const [currentUser, setCurrentUser] = useState(() => {
     try { const r = localStorage.getItem("adm-user"); return r ? JSON.parse(r) : null; } catch { return null; }
   });
 
-  // Login form state
-  const [loginStep, setLoginStep] = useState("form"); // "form" | "verify"
+  const [loginStep, setLoginStep] = useState("form");
   const [loginName, setLoginName] = useState("");
   const [loginEmail, setLoginEmail] = useState("");
   const [loginRole, setLoginRole] = useState(DEFAULT_ROLES[0]);
@@ -108,7 +101,6 @@ export default function App() {
   const [loginSuccess, setLoginSuccess] = useState("");
   const [resendCooldown, setResendCooldown] = useState(0);
 
-  // App data state
   const [loading, setLoading] = useState(true);
   const [employees, setEmployees] = useState([]);
   const [rolesList, setRolesList] = useState(DEFAULT_ROLES);
@@ -121,20 +113,17 @@ export default function App() {
   const [exportNote, setExportNote] = useState("");
   const [appError, setAppError] = useState("");
 
-  // Add employee form
   const [newEmpName, setNewEmpName] = useState("");
   const [newEmpEmail, setNewEmpEmail] = useState("");
   const [newEmpRole, setNewEmpRole] = useState(DEFAULT_ROLES[0]);
   const [confirmClear, setConfirmClear] = useState(false);
 
-  // Resend cooldown timer
   useEffect(() => {
     if (resendCooldown <= 0) return;
     const t = setTimeout(() => setResendCooldown(c => c - 1), 1000);
     return () => clearTimeout(t);
   }, [resendCooldown]);
 
-  // Fetch data
   const fetchData = useCallback(async (isInitial = false) => {
     if (isInitial) setLoading(true);
     try {
@@ -175,17 +164,14 @@ export default function App() {
     return () => { clearInterval(iv); window.removeEventListener("focus", onFocus); };
   }, [fetchData]);
 
-  // ── Login handlers ──────────────────────────────────────────────────────────
   const handleSendOtp = async (e) => {
     e?.preventDefault();
     if (!loginName.trim()) return setLoginError("Please enter your full name.");
     if (!loginEmail.trim() || !loginEmail.includes("@")) return setLoginError("Please enter a valid email address.");
     setLoginError(""); setLoginLoading(true);
-
     try {
       const res = await fetch("/api/send-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: loginEmail.trim(), name: loginName.trim() })
       });
       const data = await res.json();
@@ -204,17 +190,14 @@ export default function App() {
     e?.preventDefault();
     if (otp.replace(/\D/g,"").length < 6) return setLoginError("Please enter the full 6-digit code.");
     setLoginError(""); setLoginLoading(true);
-
     try {
       const res = await fetch("/api/verify-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: loginEmail.trim(), otp: otp.trim() })
       });
       const data = await res.json();
       if (!data.success) throw new Error(data.error || "Verification failed");
 
-      // Check if employee exists by email, else create
       const existing = employees.find(emp => emp.email?.toLowerCase() === loginEmail.toLowerCase().trim());
       let userObj;
       if (existing) {
@@ -224,13 +207,11 @@ export default function App() {
         setEmployees(prev => [...prev, userObj]);
         try {
           await fetch("/api/employees", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
+            method: "POST", headers: { "Content-Type": "application/json" },
             body: JSON.stringify(userObj)
           });
         } catch {}
       }
-
       setCurrentUser(userObj);
       try { localStorage.setItem("adm-user", JSON.stringify(userObj)); } catch {}
     } catch (err) {
@@ -247,7 +228,6 @@ export default function App() {
     try { localStorage.removeItem("adm-user"); } catch {}
   };
 
-  // ── Attendance handlers ─────────────────────────────────────────────────────
   const setStatus = async (empId, dateStr, status, site) => {
     const key = `${empId}__${dateStr}`;
     const next = { ...attendance };
@@ -284,7 +264,6 @@ export default function App() {
     } catch {}
   };
 
-  // ── Employee handlers ───────────────────────────────────────────────────────
   const addEmployee = async () => {
     if (!newEmpName.trim()) return;
     const emp = { id: uid(), name: newEmpName.trim(), email: newEmpEmail.trim(), role: newEmpRole };
@@ -293,7 +272,7 @@ export default function App() {
     try {
       await fetch("/api/employees", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(emp) });
       fetchData(false);
-    } catch (err) { setAppError("Failed to save employee."); }
+    } catch { setAppError("Failed to save employee."); }
   };
 
   const removeEmployee = async (id) => {
@@ -309,7 +288,6 @@ export default function App() {
     try { await fetch("/api/clear-all", { method: "POST" }); fetchData(false); } catch {}
   };
 
-  // ── Computed values ─────────────────────────────────────────────────────────
   const selectedDateStr = fmtDate(selectedDate);
 
   const todayStats = useMemo(() => {
@@ -350,7 +328,6 @@ export default function App() {
     return stats;
   }, [attendance, employees, monthDays, registerMonth]);
 
-  // ── Export ─────────────────────────────────────────────────────────────────
   const exportMonthly = () => {
     const y = registerMonth.getFullYear(), m = registerMonth.getMonth();
     const mn = monthLabel(registerMonth);
@@ -398,51 +375,49 @@ export default function App() {
     setExportNote(`Downloaded (${clients.length} clients)`); setTimeout(()=>setExportNote(""),3000);
   };
 
-  // ── Loading splash ─────────────────────────────────────────────────────────
   if (loading && !currentUser) {
     return (
       <div className="splash">
         <div className="splash-inner">
           <img src="/Logo.png" alt="Logo" className="splash-logo" />
-          <Loader2 size={20} className="spinner" />
+          <Loader2 size={18} className="spinner" />
           <span>Loading...</span>
         </div>
       </div>
     );
   }
 
-  // ── Login / Verify Screen ──────────────────────────────────────────────────
+  // ── Auth Screen ───────────────────────────────────────────────────────────
   if (!currentUser) {
     return (
       <div className="auth-wrapper">
-        {/* Left panel (decorative) */}
+        {/* Left Panel */}
         <div className="auth-left">
           <img src="/Logo.png" alt="Logo" className="auth-brand-logo" />
           <h1 className="auth-brand-name">Attendance<br/>Tracker</h1>
-          <p className="auth-brand-sub">Simple. Fast. Reliable.</p>
-          <div className="auth-dots">
-            <span/><span/><span/>
-          </div>
+          <p className="auth-brand-sub">Mark attendance. Export reports.<br/>Simple and fast.</p>
+          <div className="auth-divider-line" />
+          <p className="auth-brand-note">Used by teams to track daily attendance and generate monthly reports.</p>
         </div>
 
-        {/* Right panel (form) */}
+        {/* Right Panel */}
         <div className="auth-right">
           <div className="auth-card">
+
             {loginStep === "form" ? (
               <>
                 <div className="auth-header">
-                  <h2>Welcome 👋</h2>
-                  <p>Enter your details to continue</p>
+                  <h2>Sign In</h2>
+                  <p>Enter your name and email to get a verification code</p>
                 </div>
 
                 {loginError && <div className="auth-alert error">{loginError}</div>}
 
                 <form onSubmit={handleSendOtp} className="auth-form">
-                  {/* Name */}
                   <div className="field-group">
                     <label>Full Name</label>
                     <div className="input-wrapper">
-                      <User size={16} className="input-icon" />
+                      <User size={15} className="input-icon" />
                       <input
                         className="field-input"
                         placeholder="e.g. Hassan Ahmed"
@@ -453,15 +428,14 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* Email */}
                   <div className="field-group">
                     <label>Email Address</label>
                     <div className="input-wrapper">
-                      <Mail size={16} className="input-icon" />
+                      <Mail size={15} className="input-icon" />
                       <input
                         className="field-input"
                         type="email"
-                        placeholder="e.g. hassan@company.com"
+                        placeholder="e.g. hassan@firm.com"
                         value={loginEmail}
                         onChange={e => setLoginEmail(e.target.value)}
                         required
@@ -469,34 +443,35 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* Role Grid */}
                   <div className="field-group">
-                    <label>Select Your Role</label>
-                    <div className="role-grid">
+                    <label>Select Role</label>
+                    <div className="role-select-grid">
                       {rolesList.map(r => (
                         <button
                           key={r}
                           type="button"
-                          className={`role-tile ${loginRole === r ? "active" : ""}`}
+                          className={`role-option ${loginRole === r ? "active" : ""}`}
                           onClick={() => setLoginRole(r)}
                         >
-                          <span className="role-icon">{ROLE_ICONS[r] || "👤"}</span>
-                          <span className="role-label">{r}</span>
+                          {r}
                         </button>
                       ))}
                     </div>
                   </div>
 
                   <button type="submit" className="btn-primary" disabled={loginLoading}>
-                    {loginLoading ? <Loader2 size={16} className="spinner" /> : <><span>Send Verification Code</span> <ArrowRight size={16} /></>}
+                    {loginLoading
+                      ? <><Loader2 size={15} className="spinner" /> Sending...</>
+                      : <><span>Send Verification Code</span><ArrowRight size={15} /></>
+                    }
                   </button>
                 </form>
               </>
             ) : (
               <>
                 <div className="auth-header">
-                  <h2>Check your inbox ✉️</h2>
-                  <p>We sent a 6-digit code to<br/><strong>{loginEmail}</strong></p>
+                  <h2>Verify Email</h2>
+                  <p>Enter the 6-digit code sent to <strong>{loginEmail}</strong></p>
                 </div>
 
                 {loginError && <div className="auth-alert error">{loginError}</div>}
@@ -506,23 +481,20 @@ export default function App() {
                   <OtpInput value={otp} onChange={setOtp} />
 
                   <button type="submit" className="btn-primary" disabled={loginLoading || otp.replace(/\D/g,"").length < 6}>
-                    {loginLoading ? <Loader2 size={16} className="spinner" /> : <><span>Verify & Continue</span> <ArrowRight size={16} /></>}
+                    {loginLoading
+                      ? <><Loader2 size={15} className="spinner" /> Verifying...</>
+                      : <><span>Verify and Continue</span><ArrowRight size={15} /></>
+                    }
                   </button>
 
-                  <div className="otp-footer">
-                    <button
-                      type="button"
-                      className="btn-ghost"
-                      onClick={() => { setLoginStep("form"); setOtp(""); setLoginError(""); setLoginSuccess(""); }}
-                    >
-                      ← Back
+                  <div className="otp-actions">
+                    <button type="button" className="btn-ghost"
+                      onClick={() => { setLoginStep("form"); setOtp(""); setLoginError(""); setLoginSuccess(""); }}>
+                      Back
                     </button>
-                    <button
-                      type="button"
-                      className="btn-ghost"
+                    <button type="button" className="btn-ghost"
                       disabled={resendCooldown > 0}
-                      onClick={handleSendOtp}
-                    >
+                      onClick={handleSendOtp}>
                       {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : "Resend Code"}
                     </button>
                   </div>
@@ -538,56 +510,47 @@ export default function App() {
   // ── Main Dashboard ─────────────────────────────────────────────────────────
   return (
     <div className="app">
-
-      {/* Top Bar */}
       <header className="topbar">
         <div className="topbar-inner">
           <div className="topbar-left">
             <img src="/Logo.png" alt="Logo" className="topbar-logo" />
             <span className="topbar-title">Attendance Tracker</span>
           </div>
-          <div className="topbar-right">
-            <div className="user-pill">
-              <div className="user-avatar">{currentUser.name.charAt(0).toUpperCase()}</div>
-              <div className="user-info">
-                <span className="user-name">{currentUser.name}</span>
-                <span className="user-role">{currentUser.role}</span>
-              </div>
-              <button className="logout-btn" onClick={handleLogout} title="Sign out">
-                <LogOut size={14} />
-              </button>
+          <div className="user-pill">
+            <div className="user-av">{currentUser.name.charAt(0).toUpperCase()}</div>
+            <div className="user-info">
+              <span className="user-name">{currentUser.name}</span>
+              <span className="user-role">{currentUser.role}</span>
             </div>
+            <button className="logout-btn" onClick={handleLogout} title="Sign out">
+              <LogOut size={13} />
+            </button>
           </div>
         </div>
-
-        {/* Navigation */}
-        <div className="nav-bar">
+        <nav className="nav-bar">
           <button className={`nav-btn ${tab==="today"?"active":""}`} onClick={()=>setTab("today")}>
-            <CalendarDays size={15} /> Today
+            <CalendarDays size={14}/> Today
           </button>
           <button className={`nav-btn ${tab==="register"?"active":""}`} onClick={()=>setTab("register")}>
-            <BookOpen size={15} /> Register
+            <BookOpen size={14}/> Register
           </button>
           <button className={`nav-btn ${tab==="employees"?"active":""}`} onClick={()=>setTab("employees")}>
-            <Users size={15} /> Employees
+            <Users size={14}/> Employees
           </button>
-        </div>
+        </nav>
       </header>
 
-      {/* Content */}
       <main className="content">
         {appError && (
           <div className="app-alert">
-            <AlertCircle size={15} />
-            <span>{appError}</span>
-            <button onClick={()=>setAppError("")}><X size={13}/></button>
+            <AlertCircle size={14}/><span>{appError}</span>
+            <button onClick={()=>setAppError("")}><X size={12}/></button>
           </div>
         )}
 
-        {/* ── TODAY TAB ─────────────────────────────────────────────────── */}
+        {/* TODAY */}
         {tab === "today" && (
           <>
-            {/* Date selector */}
             <div className="card date-nav">
               <button className="icon-btn" onClick={()=>setSelectedDate(new Date(selectedDate.getTime()-86400000))}><ChevronLeft size={16}/></button>
               <div className="date-center">
@@ -598,30 +561,21 @@ export default function App() {
               <button className="chip-btn" onClick={()=>setSelectedDate(new Date())}>Today</button>
             </div>
 
-            {/* Stats */}
             {employees.length > 0 && (
               <div className="card stats-card">
                 <div className="stats-row">
-                  <div className="stat-item">
-                    <span className="stat-num" style={{color:"#16a34a"}}>{todayStats.present}</span>
-                    <span className="stat-lbl">Present</span>
-                  </div>
-                  <div className="stat-item">
-                    <span className="stat-num" style={{color:"#334155"}}>{todayStats.absent}</span>
-                    <span className="stat-lbl">Absent</span>
-                  </div>
-                  <div className="stat-item">
-                    <span className="stat-num" style={{color:"#d97706"}}>{todayStats.leave}</span>
-                    <span className="stat-lbl">Leave</span>
-                  </div>
-                  <div className="stat-item">
-                    <span className="stat-num" style={{color:"#6366f1"}}>{todayStats.half}</span>
-                    <span className="stat-lbl">Half</span>
-                  </div>
-                  <div className="stat-item">
-                    <span className="stat-num">{todayStats.pct}%</span>
-                    <span className="stat-lbl">Marked</span>
-                  </div>
+                  {[
+                    {label:"Present", val:todayStats.present, color:"#16a34a"},
+                    {label:"Absent",  val:todayStats.absent,  color:"#334155"},
+                    {label:"Leave",   val:todayStats.leave,   color:"#d97706"},
+                    {label:"Half",    val:todayStats.half,    color:"#6366f1"},
+                    {label:"Marked",  val:`${todayStats.pct}%`, color:"#0f172a"},
+                  ].map(s => (
+                    <div key={s.label} className="stat-item">
+                      <span className="stat-num" style={{color:s.color}}>{s.val}</span>
+                      <span className="stat-lbl">{s.label}</span>
+                    </div>
+                  ))}
                 </div>
                 <div className="progress-track">
                   <div className="progress-seg" style={{width:`${(todayStats.present/(todayStats.total||1))*100}%`,background:"#16a34a"}}/>
@@ -629,8 +583,8 @@ export default function App() {
                   <div className="progress-seg" style={{width:`${(todayStats.leave/(todayStats.total||1))*100}%`,background:"#d97706"}}/>
                   <div className="progress-seg" style={{width:`${(todayStats.half/(todayStats.total||1))*100}%`,background:"#6366f1"}}/>
                 </div>
-                <div className="stats-actions">
-                  <button className="btn-mark-all" onClick={markAllPresent}><CheckCheck size={14}/> Mark All Present</button>
+                <div className="stats-footer">
+                  <button className="btn-mark-all" onClick={markAllPresent}><CheckCheck size={13}/> Mark All Present</button>
                   <div className="filter-pills">
                     {["all","unmarked","present","absent","leave"].map(f=>(
                       <button key={f} className={`filter-pill ${filterStatus===f?"active":""}`} onClick={()=>setFilterStatus(f)}>
@@ -642,12 +596,10 @@ export default function App() {
               </div>
             )}
 
-            {/* Employee cards */}
             {employees.length === 0 ? (
               <div className="card empty-state">
-                <div className="empty-icon">👥</div>
-                <h3>No employees yet</h3>
-                <p>Go to the Employees tab to add your team</p>
+                <h3>No employees added</h3>
+                <p>Go to the Employees tab to add your team members</p>
               </div>
             ) : (
               filteredEmployees.map(emp => {
@@ -668,12 +620,10 @@ export default function App() {
                         const meta = STATUS[s];
                         const active = cur === s;
                         return (
-                          <button
-                            key={s}
-                            className={`status-btn ${active ? "status-active" : ""}`}
-                            style={active ? { background: meta.color, borderColor: meta.color, color: "#fff" } : {}}
-                            onClick={() => setStatus(emp.id, selectedDateStr, active ? null : s)}
-                          >
+                          <button key={s}
+                            className={`status-btn ${active ? "active" : ""}`}
+                            style={active ? {background:meta.color, borderColor:meta.color, color:"#fff"} : {}}
+                            onClick={() => setStatus(emp.id, selectedDateStr, active ? null : s)}>
                             {meta.label}
                           </button>
                         );
@@ -681,9 +631,7 @@ export default function App() {
                     </div>
                     {cur === "present" && (
                       <div className="site-row">
-                        <input
-                          className="site-input"
-                          placeholder="Location (optional)"
+                        <input className="site-input" placeholder="Location (optional)"
                           value={siteDrafts[key] ?? rec?.site ?? ""}
                           onChange={e => setSiteDrafts({...siteDrafts,[key]:e.target.value})}
                           onBlur={e => setStatus(emp.id, selectedDateStr, "present", e.target.value)}
@@ -705,20 +653,18 @@ export default function App() {
           </>
         )}
 
-        {/* ── REGISTER TAB ──────────────────────────────────────────────── */}
+        {/* REGISTER */}
         {tab === "register" && (
           <>
             <div className="card date-nav">
               <button className="icon-btn" onClick={()=>setRegisterMonth(new Date(registerMonth.getFullYear(),registerMonth.getMonth()-1,1))}><ChevronLeft size={16}/></button>
-              <div className="date-center">
-                <span className="date-main">{monthLabel(registerMonth)}</span>
-              </div>
+              <div className="date-center"><span className="date-main">{monthLabel(registerMonth)}</span></div>
               <button className="icon-btn" onClick={()=>setRegisterMonth(new Date(registerMonth.getFullYear(),registerMonth.getMonth()+1,1))}><ChevronRight size={16}/></button>
             </div>
 
             <div className="export-row">
-              <button className="btn-outline" onClick={exportMonthly} disabled={!employees.length}><Download size={14}/> Monthly Excel</button>
-              <button className="btn-outline" onClick={exportClientReport} disabled={!employees.length}><Building2 size={14}/> Client Report</button>
+              <button className="btn-outline" onClick={exportMonthly} disabled={!employees.length}><Download size={13}/> Monthly Excel</button>
+              <button className="btn-outline" onClick={exportClientReport} disabled={!employees.length}><Building2 size={13}/> Client Report</button>
               {exportNote && <span className="export-note">{exportNote}</span>}
             </div>
 
@@ -732,7 +678,7 @@ export default function App() {
             </div>
 
             {employees.length === 0 ? (
-              <div className="card empty-state"><div className="empty-icon">📊</div><h3>No data yet</h3><p>Add employees to see the register</p></div>
+              <div className="card empty-state"><h3>No data</h3><p>Add employees to see the register</p></div>
             ) : (
               <div className="card" style={{padding:0,overflow:"hidden"}}>
                 <div className="table-scroll">
@@ -757,12 +703,12 @@ export default function App() {
                             const meta = r ? STATUS[r.status] : null;
                             return (
                               <td key={day}>
-                                <div
-                                  className="cell-badge"
-                                  style={meta ? {background:meta.color,color:"#fff",borderColor:meta.color} : {}}
-                                  title={meta ? `${meta.label}${r.site?" — "+r.site:""}` : "Not marked"}
-                                  onClick={() => cycleStatus(emp.id, ds)}
-                                >{meta ? meta.short : ""}</div>
+                                <div className="cell-badge"
+                                  style={meta?{background:meta.color,color:"#fff",borderColor:meta.color}:{}}
+                                  title={meta?`${meta.label}${r.site?" — "+r.site:""}` : "Not marked"}
+                                  onClick={() => cycleStatus(emp.id, ds)}>
+                                  {meta ? meta.short : ""}
+                                </div>
                               </td>
                             );
                           })}
@@ -777,54 +723,53 @@ export default function App() {
           </>
         )}
 
-        {/* ── EMPLOYEES TAB ─────────────────────────────────────────────── */}
+        {/* EMPLOYEES */}
         {tab === "employees" && (
           <>
             <div className="card">
               <h3 className="section-title">Add New Employee</h3>
               <div className="add-form">
                 <input className="field-input" placeholder="Full name" value={newEmpName} onChange={e=>setNewEmpName(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addEmployee()} />
-                <input className="field-input" placeholder="Email (optional)" value={newEmpEmail} onChange={e=>setNewEmpEmail(e.target.value)} />
+                <input className="field-input" placeholder="Email address (optional)" value={newEmpEmail} onChange={e=>setNewEmpEmail(e.target.value)} />
                 <div className="field-group" style={{marginBottom:0}}>
-                  <label style={{fontSize:11,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.5px",color:"#64748b",marginBottom:6,display:"block"}}>Role</label>
-                  <div className="role-grid compact">
+                  <label style={{fontSize:11,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.5px",color:"#64748b",marginBottom:8,display:"block"}}>Select Role</label>
+                  <div className="role-select-grid">
                     {rolesList.map(r => (
                       <button key={r} type="button"
-                        className={`role-tile ${newEmpRole===r?"active":""}`}
+                        className={`role-option ${newEmpRole===r?"active":""}`}
                         onClick={()=>setNewEmpRole(r)}>
-                        <span className="role-icon">{ROLE_ICONS[r]||"👤"}</span>
-                        <span className="role-label">{r}</span>
+                        {r}
                       </button>
                     ))}
                   </div>
                 </div>
                 <button className="btn-primary" onClick={addEmployee} disabled={!newEmpName.trim()}>
-                  <Plus size={16}/> Add Employee
+                  <Plus size={15}/> Add Employee
                 </button>
               </div>
             </div>
 
             {employees.length === 0 ? (
-              <div className="card empty-state"><div className="empty-icon">👥</div><h3>No employees yet</h3><p>Add your first team member above</p></div>
+              <div className="card empty-state"><h3>No employees yet</h3><p>Add your first team member above</p></div>
             ) : (
               employees.map(emp => (
                 <div className="card emp-card" key={emp.id} style={{flexDirection:"row",alignItems:"center",gap:12}}>
                   <div className="emp-av">{emp.name.charAt(0).toUpperCase()}</div>
                   <div className="emp-meta" style={{flex:1}}>
                     <span className="emp-name">{emp.name}</span>
-                    <span className="emp-role-tag">{emp.role}{emp.email&&<> · {emp.email}</>}</span>
+                    <span className="emp-role-tag">{emp.role}{emp.email ? ` · ${emp.email}` : ""}</span>
                   </div>
-                  <button className="btn-danger" onClick={()=>removeEmployee(emp.id)}><Trash2 size={14}/></button>
+                  <button className="btn-danger" onClick={()=>removeEmployee(emp.id)}><Trash2 size={13}/></button>
                 </div>
               ))
             )}
 
             <div style={{marginTop:32,paddingTop:20,borderTop:"1px solid #f1f5f9"}}>
               {!confirmClear ? (
-                <button className="btn-ghost-danger" onClick={()=>setConfirmClear(true)}><Trash2 size={13}/> Clear all data</button>
+                <button className="btn-ghost-danger" onClick={()=>setConfirmClear(true)}><Trash2 size={12}/> Clear all data</button>
               ) : (
                 <div className="confirm-clear">
-                  <p>This will permanently delete all employees and attendance records.</p>
+                  <p>Permanently delete all employees and attendance records?</p>
                   <div style={{display:"flex",gap:8,marginTop:10}}>
                     <button className="btn-danger" onClick={clearAll}>Confirm</button>
                     <button className="btn-ghost" onClick={()=>setConfirmClear(false)}>Cancel</button>
