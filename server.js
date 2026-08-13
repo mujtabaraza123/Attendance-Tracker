@@ -50,13 +50,15 @@ async function initDb() {
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
         email TEXT DEFAULT '',
+        password TEXT DEFAULT '',
         role TEXT NOT NULL DEFAULT 'Staff',
         created_at TIMESTAMPTZ DEFAULT NOW()
       );
     `);
-    // Add email column if it doesn't exist (migration)
+    // Add email & password columns if they don't exist (migration)
     await client.query(`
       ALTER TABLE public.employees ADD COLUMN IF NOT EXISTS email TEXT DEFAULT '';
+      ALTER TABLE public.employees ADD COLUMN IF NOT EXISTS password TEXT DEFAULT '';
     `);
     await client.query(`
       CREATE TABLE IF NOT EXISTS public.attendance (
@@ -167,15 +169,39 @@ app.get('/api/all-data', async (req, res) => {
   }
 });
 
+// POST /api/login — authenticate user with email and password
+app.post('/api/login', async (req, res) => {
+  const { email, password } = req.body;
+  if (!email || !password) return res.status(400).json({ success: false, error: 'Email and password are required' });
+
+  try {
+    const result = await pool.query(
+      `SELECT id, name, email, password, role FROM public.employees WHERE LOWER(email) = LOWER($1);`,
+      [email.trim()]
+    );
+    if (result.rows.length === 0) {
+      return res.json({ success: false, error: 'No account found with this email. Please sign up.' });
+    }
+    const user = result.rows[0];
+    if (user.password && user.password !== password.trim()) {
+      return res.json({ success: false, error: 'Incorrect password. Please try again.' });
+    }
+    res.json({ success: true, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
+  } catch (err) {
+    console.error("Error logging in:", err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // POST add employee
 app.post('/api/employees', async (req, res) => {
-  const { id, name, email, role } = req.body;
+  const { id, name, email, password, role } = req.body;
   if (!id || !name) return res.status(400).json({ error: "Missing id or name" });
 
   try {
     await pool.query(
-      `INSERT INTO public.employees (id, name, email, role) VALUES ($1, $2, $3, $4) ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, email = EXCLUDED.email, role = EXCLUDED.role;`,
-      [id, name, email || '', role || 'Staff']
+      `INSERT INTO public.employees (id, name, email, password, role) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, email = EXCLUDED.email, password = EXCLUDED.password, role = EXCLUDED.role;`,
+      [id, name, email || '', password || '', role || 'Staff']
     );
     res.json({ success: true });
   } catch (err) {

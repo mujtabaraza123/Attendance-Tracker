@@ -43,18 +43,18 @@ export default function App() {
   const [authStep, setAuthStep] = useState("form"); // "form" | "verify"
 
   // Login fields
-  const [loginName,  setLoginName]  = useState("");
-  const [loginEmail, setLoginEmail] = useState("");
+  const [loginEmail,    setLoginEmail]    = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
 
   // Signup fields
-  const [signupName,  setSignupName]  = useState("");
-  const [signupEmail, setSignupEmail] = useState("");
-  const [signupRole,  setSignupRole]  = useState(DEFAULT_ROLES[0]);
+  const [signupName,     setSignupName]     = useState("");
+  const [signupEmail,    setSignupEmail]    = useState("");
+  const [signupPassword, setSignupPassword] = useState("");
+  const [signupRole,     setSignupRole]     = useState(DEFAULT_ROLES[0]);
   const [otp, setOtp] = useState("");
 
   const [authLoading, setAuthLoading] = useState(false);
   const [authError,   setAuthError]   = useState("");
-  const [authNote,    setAuthNote]    = useState("");
   const [cooldown,    setCooldown]    = useState(0);
 
   // ── App data ─────────────────────────────────────────────────────────────────
@@ -123,23 +123,26 @@ export default function App() {
 
   // ── Auth handlers ────────────────────────────────────────────────────────────
 
-  // LOGIN — just match by email
+  // LOGIN — check email & password via DB
   const handleLogin = async (e) => {
     e?.preventDefault();
-    const name  = loginName.trim();
-    const email = loginEmail.trim().toLowerCase();
-    if (!name)  return setAuthError("Please enter your name.");
+    const email    = loginEmail.trim();
+    const password = loginPassword.trim();
     if (!email || !email.includes("@")) return setAuthError("Please enter a valid email.");
+    if (!password) return setAuthError("Please enter your password.");
     setAuthError(""); setAuthLoading(true);
     try {
-      const all = await fetch("/api/all-data").then(r=>r.json());
-      const found = (all.employees||[]).find(emp => emp.email?.toLowerCase() === email);
-      if (!found) {
-        setAuthError("No account found with this email. Please sign up first.");
+      const res  = await fetch("/api/login", {
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ email, password })
+      });
+      const data = await res.json();
+      if (!data.success) {
+        setAuthError(data.error || "Login failed.");
         return;
       }
-      setCurrentUser(found);
-      localStorage.setItem("adm-user", JSON.stringify(found));
+      setCurrentUser(data.user);
+      localStorage.setItem("adm-user", JSON.stringify(data.user));
     } catch {
       setAuthError("Something went wrong. Please try again.");
     } finally { setAuthLoading(false); }
@@ -148,10 +151,12 @@ export default function App() {
   // SIGNUP — send OTP
   const handleSendOtp = async (e) => {
     e?.preventDefault();
-    const name  = signupName.trim();
-    const email = signupEmail.trim();
+    const name     = signupName.trim();
+    const email    = signupEmail.trim();
+    const password = signupPassword.trim();
     if (!name)  return setAuthError("Please enter your name.");
     if (!email || !email.includes("@")) return setAuthError("Please enter a valid email.");
+    if (!password) return setAuthError("Please create a password.");
     setAuthError(""); setAuthLoading(true);
     try {
       const res  = await fetch("/api/send-otp", {
@@ -179,18 +184,19 @@ export default function App() {
       const data = await res.json();
       if (!data.success) throw new Error(data.error||"Verification failed");
 
-      const existing = employees.find(emp => emp.email?.toLowerCase() === signupEmail.toLowerCase().trim());
-      let user;
-      if (existing) {
-        user = existing;
-      } else {
-        user = { id:uid(), name:signupName.trim(), email:signupEmail.trim(), role:signupRole };
-        setEmployees(prev=>[...prev,user]);
-        await fetch("/api/employees", {
-          method:"POST", headers:{"Content-Type":"application/json"},
-          body: JSON.stringify(user)
-        }).catch(()=>{});
-      }
+      const user = {
+        id: uid(),
+        name: signupName.trim(),
+        email: signupEmail.trim(),
+        password: signupPassword.trim(),
+        role: signupRole
+      };
+      setEmployees(prev=>[...prev,user]);
+      await fetch("/api/employees", {
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify(user)
+      }).catch(()=>{});
+
       setCurrentUser(user);
       localStorage.setItem("adm-user", JSON.stringify(user));
     } catch (err) { setAuthError(err.message);
@@ -200,15 +206,15 @@ export default function App() {
   const handleLogout = () => {
     setCurrentUser(null);
     setAuthTab("login"); setAuthStep("form");
-    setLoginName(""); setLoginEmail("");
-    setSignupName(""); setSignupEmail(""); setSignupRole(DEFAULT_ROLES[0]);
-    setOtp(""); setAuthError(""); setAuthNote("");
+    setLoginEmail(""); setLoginPassword("");
+    setSignupName(""); setSignupEmail(""); setSignupPassword(""); setSignupRole(DEFAULT_ROLES[0]);
+    setOtp(""); setAuthError("");
     localStorage.removeItem("adm-user");
   };
 
   const switchTab = (t) => {
     setAuthTab(t); setAuthStep("form");
-    setAuthError(""); setAuthNote(""); setOtp("");
+    setAuthError(""); setOtp("");
   };
 
   // ── Attendance ───────────────────────────────────────────────────────────────
@@ -381,12 +387,12 @@ export default function App() {
           {authTab === "login" && (
             <form className="auth-form" onSubmit={handleLogin}>
               <div className="fld">
-                <label>Name</label>
-                <input className="finput" placeholder="Your full name" value={loginName} onChange={e=>setLoginName(e.target.value)} required />
-              </div>
-              <div className="fld">
                 <label>Email</label>
                 <input className="finput" type="email" placeholder="you@firm.com" value={loginEmail} onChange={e=>setLoginEmail(e.target.value)} required />
+              </div>
+              <div className="fld">
+                <label>Password</label>
+                <input className="finput" type="password" placeholder="Enter your password" value={loginPassword} onChange={e=>setLoginPassword(e.target.value)} required />
               </div>
               <button className="auth-submit" type="submit" disabled={authLoading}>
                 {authLoading ? <Loader2 size={14} className="spin"/> : "Login"}
@@ -405,6 +411,10 @@ export default function App() {
               <div className="fld">
                 <label>Email</label>
                 <input className="finput" type="email" placeholder="you@firm.com" value={signupEmail} onChange={e=>setSignupEmail(e.target.value)} required />
+              </div>
+              <div className="fld">
+                <label>Password</label>
+                <input className="finput" type="password" placeholder="Create a password" value={signupPassword} onChange={e=>setSignupPassword(e.target.value)} required />
               </div>
               <div className="fld">
                 <label>Role</label>
