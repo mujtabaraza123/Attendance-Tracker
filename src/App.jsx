@@ -17,7 +17,9 @@ import {
   AlertCircle,
   CheckCheck,
   UserCheck,
-  Briefcase
+  Briefcase,
+  LogOut,
+  ArrowRight
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import "./App.css";
@@ -86,6 +88,23 @@ export default function AttendanceTracker() {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [registerMonth, setRegisterMonth] = useState(new Date());
   
+  // Current logged in user session
+  const [currentUser, setCurrentUser] = useState(() => {
+    try {
+      const raw = localStorage.getItem("adm-current-user");
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) {
+      return null;
+    }
+  });
+
+  // Login form state
+  const [loginEmpId, setLoginEmpId] = useState("");
+  const [loginNameInput, setLoginNameInput] = useState("");
+  const [loginRoleSelect, setLoginRoleSelect] = useState(DEFAULT_ROLES[0]);
+  const [isNewLoginUser, setIsNewLoginUser] = useState(false);
+
+  // Management Add Employee Form State
   const [newEmpName, setNewEmpName] = useState("");
   const [selectedRole, setSelectedRole] = useState(DEFAULT_ROLES[0]);
   const [customRoleInput, setCustomRoleInput] = useState("");
@@ -146,6 +165,55 @@ export default function AttendanceTracker() {
     };
   }, [fetchData]);
 
+  // Handle Login submission
+  const handleLoginSubmit = async (e) => {
+    e?.preventDefault();
+
+    let userToSave = null;
+
+    if (!isNewLoginUser && loginEmpId) {
+      // Existing employee selected
+      const found = employees.find(emp => emp.id === loginEmpId);
+      if (found) {
+        userToSave = found;
+      }
+    }
+
+    if (!userToSave) {
+      // New user entering name & role
+      const name = (loginNameInput || "").trim();
+      if (!name) return;
+
+      const newId = uid();
+      userToSave = { id: newId, name, role: loginRoleSelect };
+
+      // Save to employees list & database
+      setEmployees(prev => [...prev, userToSave]);
+      try {
+        await fetch("/api/employees", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(userToSave)
+        });
+      } catch (e) {}
+    }
+
+    if (userToSave) {
+      setCurrentUser(userToSave);
+      try {
+        localStorage.setItem("adm-current-user", JSON.stringify(userToSave));
+      } catch (e) {}
+    }
+  };
+
+  const handleLogout = () => {
+    setCurrentUser(null);
+    try {
+      localStorage.removeItem("adm-current-user");
+    } catch (e) {}
+  };
+
+  // Add Employee
   const addEmployee = async () => {
     const name = newEmpName.trim();
     if (!name) return;
@@ -451,6 +519,86 @@ export default function AttendanceTracker() {
     );
   }
 
+  // LOGIN SCREEN (if not logged in)
+  if (!currentUser) {
+    return (
+      <div className="login-screen-wrapper">
+        <div className="login-card">
+          <img src="/Logo.png" alt="App Logo" className="login-logo" />
+          <h2 className="login-title">Attendance Tracker</h2>
+          <p className="login-subtitle">Select your profile or enter your details to sign in</p>
+
+          <form onSubmit={handleLoginSubmit}>
+            <div className="login-form-group">
+              {employees.length > 0 && !isNewLoginUser ? (
+                <>
+                  <label className="form-label">Select Employee Profile</label>
+                  <select
+                    className="select-box"
+                    value={loginEmpId}
+                    onChange={(e) => {
+                      if (e.target.value === "__NEW_USER__") {
+                        setIsNewLoginUser(true);
+                      } else {
+                        setLoginEmpId(e.target.value);
+                      }
+                    }}
+                  >
+                    <option value="">-- Choose your name --</option>
+                    {employees.map((emp) => (
+                      <option key={emp.id} value={emp.id}>
+                        {emp.name} ({emp.role})
+                      </option>
+                    ))}
+                    <option value="__NEW_USER__">+ Register as New User...</option>
+                  </select>
+                </>
+              ) : (
+                <>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <label className="form-label">Your Name</label>
+                    {employees.length > 0 && (
+                      <button
+                        type="button"
+                        style={{ background: "none", border: "none", color: "#64748b", fontSize: 11, cursor: "pointer", textDecoration: "underline" }}
+                        onClick={() => setIsNewLoginUser(false)}
+                      >
+                        Select existing profile
+                      </button>
+                    )}
+                  </div>
+                  <input
+                    className="input-box"
+                    placeholder="Enter your full name (e.g. Hassan)"
+                    value={loginNameInput}
+                    onChange={(e) => setLoginNameInput(e.target.value)}
+                    required
+                  />
+
+                  <label className="form-label" style={{ marginTop: 10 }}>Select Role</label>
+                  <select
+                    className="select-box"
+                    value={loginRoleSelect}
+                    onChange={(e) => setLoginRoleSelect(e.target.value)}
+                  >
+                    {rolesList.map((r) => (
+                      <option key={r} value={r}>{r}</option>
+                    ))}
+                  </select>
+                </>
+              )}
+            </div>
+
+            <button type="submit" className="btn-charcoal-login">
+              Continue to App <ArrowRight size={16} />
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  // MAIN DASHBOARD (When Logged In)
   return (
     <div className="app-container">
       
@@ -459,12 +607,18 @@ export default function AttendanceTracker() {
         <div className="header-inner">
           <div className="header-brand">
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <img src="/Logo.png" alt="Attendance Tracker Logo" style={{ width: 34, height: 34, objectFit: "contain", borderRadius: 8 }} />
+              <img src="/Logo.png" alt="Logo" className="header-logo-circle" />
               <h1>Attendance Tracker</h1>
             </div>
-            <span className="emp-counter-badge">
-              {employees.length} {employees.length === 1 ? "Employee" : "Employees"}
-            </span>
+
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div className="user-session-badge">
+                <span>{currentUser.name} ({currentUser.role})</span>
+                <button className="btn-switch-user" title="Switch User" onClick={handleLogout}>
+                  Switch
+                </button>
+              </div>
+            </div>
           </div>
 
           {/* Nav Pills */}

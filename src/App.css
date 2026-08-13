@@ -1,4 +1,4 @@
-/* Modern Native App Layout — Mobile & Desktop High Quality Design */
+/* Full-Page Modern App Layout — Mobile & Desktop Native Experience */
 
 :root {
   --bg-main: #f8fafc;
@@ -64,6 +64,15 @@ body, html {
   margin-bottom: 14px;
 }
 
+.header-logo-circle {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #e2e8f0;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+}
+
 .header-brand h1 {
   font-size: 20px;
   font-weight: 800;
@@ -72,13 +81,33 @@ body, html {
   margin: 0;
 }
 
-.emp-counter-badge {
+.user-session-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   background: #f1f5f9;
-  color: var(--text-muted);
-  font-size: 12px;
-  font-weight: 600;
   padding: 4px 10px;
   border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--charcoal);
+  border: 1px solid var(--border-color);
+}
+
+.btn-switch-user {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+
+.btn-switch-user:hover {
+  color: var(--charcoal);
+  background: #e2e8f0;
 }
 
 /* Nav Pills */
@@ -125,6 +154,126 @@ body, html {
   margin: 0 auto;
   padding: 20px 20px 60px 20px;
   box-sizing: border-box;
+}
+
+/* Login Screen Container */
+.login-screen-wrapper {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: #f8fafc;
+  box-sizing: border-box;
+}
+
+.login-card {
+  width: 100%;
+  max-width: 440px;
+  background: #ffffff;
+  border: 1px solid var(--border-color);
+  border-radius: 24px;
+  padding: 36px 28px;
+  box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.05), 0 0 1px rgba(0, 0, 0, 0.08);
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.login-logo {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  object-fit: cover;
+  margin: 0 auto 14px auto;
+  border: 3px solid #f1f5f9;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+.login-title {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--charcoal);
+  margin-bottom: 6px;
+}
+
+.login-subtitle {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 28px;
+}
+
+.login-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  text-align: left;
+  margin-bottom: 24px;
+}
+
+.form-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-main);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: -6px;
+}
+
+/* Styled Round Selection Box & Inputs */
+.select-box, .input-box {
+  width: 100%;
+  padding: 12px 16px;
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  font-size: 14px;
+  font-weight: 500;
+  outline: none;
+  background: #ffffff;
+  color: var(--text-main);
+  box-sizing: border-box;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%3C64748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  background-size: 16px;
+  transition: all 0.2s ease;
+}
+
+.input-box {
+  background-image: none;
+}
+
+.select-box:focus, .input-box:focus {
+  border-color: var(--charcoal);
+  box-shadow: 0 0 0 3px rgba(15, 23, 42, 0.08);
+}
+
+.btn-charcoal-login {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: var(--charcoal);
+  color: #ffffff;
+  border: none;
+  padding: 14px;
+  border-radius: 14px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.18);
+}
+
+.btn-charcoal-login:hover {
+  background: var(--charcoal-hover);
+  transform: translateY(-1px);
+}
+
+.btn-charcoal-login:active {
+  transform: scale(0.97);
 }
 
 /* Summary Dashboard Meter */
@@ -286,7 +435,7 @@ body, html {
 .emp-avatar {
   width: 40px;
   height: 40px;
-  border-radius: 12px;
+  border-radius: 50%;
   background: #0f172a;
   color: #ffffff;
   font-weight: 800;
@@ -419,23 +568,6 @@ body, html {
   align-items: center;
 }
 
-.input-box, .select-box {
-  width: 100%;
-  padding: 12px 14px;
-  border: 1px solid var(--border-color);
-  border-radius: 10px;
-  font-size: 14px;
-  outline: none;
-  background: #ffffff;
-  color: var(--text-main);
-  box-sizing: border-box;
-}
-
-.input-box:focus, .select-box:focus {
-  border-color: var(--charcoal);
-  box-shadow: 0 0 0 3px rgba(15, 23, 42, 0.08);
-}
-
 .primary-add-btn {
   display: inline-flex;
   align-items: center;
@@ -445,7 +577,7 @@ body, html {
   color: #ffffff;
   border: none;
   padding: 12px 20px;
-  border-radius: 10px;
+  border-radius: 12px;
   font-size: 14px;
   font-weight: 700;
   cursor: pointer;
