@@ -446,7 +446,7 @@ export default function AttendanceTracker() {
     return (
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100vh" }}>
         <Loader2 size={28} style={{ animation: "spin 1s linear infinite", marginBottom: 12, color: "#0f172a" }} />
-        <span style={{ fontSize: 14, color: "#64748b", fontWeight: 600 }}>Opening Attendance Marker...</span>
+        <span style={{ fontSize: 14, color: "#64748b", fontWeight: 600 }}>Opening Attendance Tracker...</span>
       </div>
     );
   }
@@ -459,8 +459,8 @@ export default function AttendanceTracker() {
         <div className="header-inner">
           <div className="header-brand">
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <img src="/Logo.png" alt="Attendance Marker Logo" style={{ width: 34, height: 34, objectFit: "contain", borderRadius: 8 }} />
-              <h1>Attendance Marker</h1>
+              <img src="/Logo.png" alt="Attendance Tracker Logo" style={{ width: 34, height: 34, objectFit: "contain", borderRadius: 8 }} />
+              <h1>Attendance Tracker</h1>
             </div>
             <span className="emp-counter-badge">
               {employees.length} {employees.length === 1 ? "Employee" : "Employees"}
