@@ -172,7 +172,6 @@ export default function AttendanceTracker() {
     let userToSave = null;
 
     if (!isNewLoginUser && loginEmpId) {
-      // Existing employee selected
       const found = employees.find(emp => emp.id === loginEmpId);
       if (found) {
         userToSave = found;
@@ -180,14 +179,12 @@ export default function AttendanceTracker() {
     }
 
     if (!userToSave) {
-      // New user entering name & role
       const name = (loginNameInput || "").trim();
       if (!name) return;
 
       const newId = uid();
       userToSave = { id: newId, name, role: loginRoleSelect };
 
-      // Save to employees list & database
       setEmployees(prev => [...prev, userToSave]);
       try {
         await fetch("/api/employees", {
@@ -526,7 +523,7 @@ export default function AttendanceTracker() {
         <div className="login-card">
           <img src="/Logo.png" alt="App Logo" className="login-logo" />
           <h2 className="login-title">Attendance Tracker</h2>
-          <p className="login-subtitle">Select your profile or enter your details to sign in</p>
+          <p className="login-subtitle">Select your profile or register to sign in</p>
 
           <form onSubmit={handleLoginSubmit}>
             <div className="login-form-group">
@@ -544,10 +541,10 @@ export default function AttendanceTracker() {
                       }
                     }}
                   >
-                    <option value="">-- Choose your name --</option>
+                    <option value="">-- Select Your Name --</option>
                     {employees.map((emp) => (
                       <option key={emp.id} value={emp.id}>
-                        {emp.name} ({emp.role})
+                        {emp.name} — {emp.role}
                       </option>
                     ))}
                     <option value="__NEW_USER__">+ Register as New User...</option>
@@ -556,11 +553,11 @@ export default function AttendanceTracker() {
               ) : (
                 <>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <label className="form-label">Your Name</label>
+                    <label className="form-label">Your Full Name</label>
                     {employees.length > 0 && (
                       <button
                         type="button"
-                        style={{ background: "none", border: "none", color: "#64748b", fontSize: 11, cursor: "pointer", textDecoration: "underline" }}
+                        style={{ background: "none", border: "none", color: "#64748b", fontSize: 11, fontWeight: 600, cursor: "pointer", textDecoration: "underline" }}
                         onClick={() => setIsNewLoginUser(false)}
                       >
                         Select existing profile
@@ -569,22 +566,26 @@ export default function AttendanceTracker() {
                   </div>
                   <input
                     className="input-box"
-                    placeholder="Enter your full name (e.g. Hassan)"
+                    placeholder="Enter your name (e.g. Hassan)"
                     value={loginNameInput}
                     onChange={(e) => setLoginNameInput(e.target.value)}
                     required
                   />
 
-                  <label className="form-label" style={{ marginTop: 10 }}>Select Role</label>
-                  <select
-                    className="select-box"
-                    value={loginRoleSelect}
-                    onChange={(e) => setLoginRoleSelect(e.target.value)}
-                  >
+                  {/* Custom Rounded Role Chip Selector Grid */}
+                  <label className="form-label">Select Your Role</label>
+                  <div className="role-picker-grid">
                     {rolesList.map((r) => (
-                      <option key={r} value={r}>{r}</option>
+                      <button
+                        key={r}
+                        type="button"
+                        className={`role-chip-btn ${loginRoleSelect === r ? "active" : ""}`}
+                        onClick={() => setLoginRoleSelect(r)}
+                      >
+                        {r}
+                      </button>
                     ))}
-                  </select>
+                  </div>
                 </>
               )}
             </div>
@@ -730,32 +731,21 @@ export default function AttendanceTracker() {
                     onKeyDown={(e) => e.key === "Enter" && addEmployee()}
                   />
 
-                  {!showCustomRole ? (
-                    <select
-                      className="select-box"
-                      value={selectedRole}
-                      onChange={(e) => {
-                        if (e.target.value === "__NEW__") {
-                          setShowCustomRole(true);
-                        } else {
-                          setSelectedRole(e.target.value);
-                        }
-                      }}
-                    >
+                  <div>
+                    <label className="form-label" style={{ display: "block", textAlign: "left", marginBottom: 6 }}>Select Role</label>
+                    <div className="role-picker-grid" style={{ justifyContent: "center" }}>
                       {rolesList.map((r) => (
-                        <option key={r} value={r}>{r}</option>
+                        <button
+                          key={r}
+                          type="button"
+                          className={`role-chip-btn ${selectedRole === r ? "active" : ""}`}
+                          onClick={() => setSelectedRole(r)}
+                        >
+                          {r}
+                        </button>
                       ))}
-                      <option value="__NEW__">+ Add Custom Role...</option>
-                    </select>
-                  ) : (
-                    <input
-                      className="input-box"
-                      placeholder="Type custom role title..."
-                      value={customRoleInput}
-                      onChange={(e) => setCustomRoleInput(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && addEmployee()}
-                    />
-                  )}
+                    </div>
+                  </div>
 
                   <button className="primary-add-btn" onClick={addEmployee}>
                     <Plus size={18} /> Add Employee
@@ -920,46 +910,52 @@ export default function AttendanceTracker() {
         {/* Tab 3: Employees Management */}
         {tab === "employees" && (
           <div>
-            {/* Prominent Add Employee Card with Role Dropdown */}
+            {/* Prominent Add Employee Card with Role Selector */}
             <div className="add-emp-card">
               <div className="add-emp-title">+ Add New Employee</div>
               <div className="add-emp-grid">
                 <input
                   className="input-box"
-                  placeholder="Employee name (e.g. Hassan)"
+                  placeholder="Employee full name (e.g. Hassan)"
                   value={newEmpName}
                   onChange={(e) => setNewEmpName(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && addEmployee()}
                 />
 
-                {!showCustomRole ? (
-                  <select
-                    className="select-box"
-                    value={selectedRole}
-                    onChange={(e) => {
-                      if (e.target.value === "__NEW__") {
-                        setShowCustomRole(true);
-                      } else {
-                        setSelectedRole(e.target.value);
-                      }
-                    }}
-                  >
+                <div>
+                  <label className="form-label" style={{ display: "block", marginBottom: 6 }}>Select Role</label>
+                  <div className="role-picker-grid">
                     {rolesList.map((r) => (
-                      <option key={r} value={r}>{r}</option>
+                      <button
+                        key={r}
+                        type="button"
+                        className={`role-chip-btn ${selectedRole === r && !showCustomRole ? "active" : ""}`}
+                        onClick={() => {
+                          setShowCustomRole(false);
+                          setSelectedRole(r);
+                        }}
+                      >
+                        {r}
+                      </button>
                     ))}
-                    <option value="__NEW__">+ Add Custom Role...</option>
-                  </select>
-                ) : (
-                  <div style={{ display: "flex", gap: 6 }}>
-                    <input
-                      className="input-box"
-                      placeholder="Custom role title..."
-                      value={customRoleInput}
-                      onChange={(e) => setCustomRoleInput(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && addEmployee()}
-                    />
-                    <button className="today-btn" onClick={() => setShowCustomRole(false)}>✕</button>
+                    <button
+                      type="button"
+                      className={`role-chip-btn ${showCustomRole ? "active" : ""}`}
+                      onClick={() => setShowCustomRole(true)}
+                    >
+                      + Custom Role
+                    </button>
                   </div>
+                </div>
+
+                {showCustomRole && (
+                  <input
+                    className="input-box"
+                    placeholder="Enter custom role title..."
+                    value={customRoleInput}
+                    onChange={(e) => setCustomRoleInput(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && addEmployee()}
+                  />
                 )}
 
                 <button className="primary-add-btn" onClick={addEmployee}>

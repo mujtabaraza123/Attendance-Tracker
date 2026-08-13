@@ -169,11 +169,11 @@ body, html {
 
 .login-card {
   width: 100%;
-  max-width: 440px;
+  max-width: 460px;
   background: #ffffff;
   border: 1px solid var(--border-color);
   border-radius: 24px;
-  padding: 36px 28px;
+  padding: 32px 24px;
   box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.05), 0 0 1px rgba(0, 0, 0, 0.08);
   text-align: center;
   box-sizing: border-box;
@@ -199,13 +199,13 @@ body, html {
 .login-subtitle {
   font-size: 13px;
   color: var(--text-muted);
-  margin-bottom: 28px;
+  margin-bottom: 24px;
 }
 
 .login-form-group {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 16px;
   text-align: left;
   margin-bottom: 24px;
 }
@@ -216,11 +216,42 @@ body, html {
   color: var(--text-main);
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  margin-bottom: -6px;
 }
 
-/* Styled Round Selection Box & Inputs */
-.select-box, .input-box {
+/* Custom Role Selector Chip Grid */
+.role-picker-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.role-chip-btn {
+  padding: 9px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+  background: #ffffff;
+  color: var(--text-main);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.role-chip-btn:hover {
+  border-color: var(--border-dark);
+  background: #f8fafc;
+}
+
+.role-chip-btn.active {
+  background: var(--charcoal);
+  color: #ffffff;
+  border-color: var(--charcoal);
+  box-shadow: 0 3px 8px rgba(15, 23, 42, 0.15);
+}
+
+/* Inputs */
+.input-box {
   width: 100%;
   padding: 12px 16px;
   border: 1px solid var(--border-color);
@@ -231,20 +262,10 @@ body, html {
   background: #ffffff;
   color: var(--text-main);
   box-sizing: border-box;
-  appearance: none;
-  -webkit-appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%3C64748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 14px center;
-  background-size: 16px;
   transition: all 0.2s ease;
 }
 
-.input-box {
-  background-image: none;
-}
-
-.select-box:focus, .input-box:focus {
+.input-box:focus {
   border-color: var(--charcoal);
   box-shadow: 0 0 0 3px rgba(15, 23, 42, 0.08);
 }
@@ -562,10 +583,9 @@ body, html {
 }
 
 .add-emp-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr auto;
-  gap: 12px;
-  align-items: center;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
 }
 
 .primary-add-btn {
@@ -705,9 +725,6 @@ table.reg-grid th.sticky-name {
   }
   .main-content {
     padding: 14px 10px 40px 10px;
-  }
-  .add-emp-grid {
-    grid-template-columns: 1fr;
   }
   .primary-add-btn {
     width: 100%;
