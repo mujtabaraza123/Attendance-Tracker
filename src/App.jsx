@@ -14,7 +14,10 @@ import {
   Loader2, 
   Download, 
   Building2, 
-  AlertCircle 
+  AlertCircle,
+  CheckCheck,
+  UserCheck,
+  Briefcase
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import "./App.css";
@@ -26,6 +29,16 @@ const STATUS = {
   half: { key: "half", label: "Half Day", short: "H", color: "#64748b" },
 };
 const STATUS_CYCLE = ["present", "absent", "leave", "half", null];
+
+const DEFAULT_ROLES = [
+  "Audit Associate",
+  "Senior Associate",
+  "Assistant Manager",
+  "Manager",
+  "Partner",
+  "Trainee",
+  "Staff"
+];
 
 function fmtDate(d) {
   const y = d.getFullYear();
@@ -67,12 +80,18 @@ export default function AttendanceTracker() {
   const [saveError, setSaveError] = useState(false);
   const [saveErrorMessage, setSaveErrorMessage] = useState("");
   const [employees, setEmployees] = useState([]);
+  const [rolesList, setRolesList] = useState(DEFAULT_ROLES);
   const [attendance, setAttendance] = useState({});
   const [tab, setTab] = useState("today");
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [registerMonth, setRegisterMonth] = useState(new Date());
+  
   const [newEmpName, setNewEmpName] = useState("");
-  const [newEmpRole, setNewEmpRole] = useState("");
+  const [selectedRole, setSelectedRole] = useState(DEFAULT_ROLES[0]);
+  const [customRoleInput, setCustomRoleInput] = useState("");
+  const [showCustomRole, setShowCustomRole] = useState(false);
+
+  const [filterStatus, setFilterStatus] = useState("all");
   const [siteDrafts, setSiteDrafts] = useState({});
   const [confirmClear, setConfirmClear] = useState(false);
   const [exportNote, setExportNote] = useState("");
@@ -89,6 +108,13 @@ export default function AttendanceTracker() {
         setEmployees(data.employees || []);
         setAttendance(data.attendance || {});
         
+        if (data.roles && data.roles.length > 0) {
+          const titles = data.roles.map(r => r.title);
+          // Combine with default roles avoiding duplicates
+          const combined = Array.from(new Set([...DEFAULT_ROLES, ...titles]));
+          setRolesList(combined);
+        }
+
         try {
           localStorage.setItem("adm-employees", JSON.stringify(data.employees || []));
           localStorage.setItem("adm-attendance", JSON.stringify(data.attendance || {}));
@@ -121,14 +147,35 @@ export default function AttendanceTracker() {
     };
   }, [fetchData]);
 
+  // Add Employee
   const addEmployee = async () => {
     const name = newEmpName.trim();
     if (!name) return;
-    const newEmp = { id: uid(), name, role: newEmpRole.trim() || "Staff" };
-    
+
+    let roleToSave = selectedRole;
+    if (showCustomRole) {
+      const custom = customRoleInput.trim();
+      if (!custom) return;
+      roleToSave = custom;
+      
+      // Save new role to DB
+      try {
+        await fetch("/api/roles", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title: custom })
+        });
+        if (!rolesList.includes(custom)) {
+          setRolesList(prev => [...prev, custom]);
+        }
+      } catch (e) {}
+    }
+
+    const newEmp = { id: uid(), name, role: roleToSave };
     setEmployees((prev) => [...prev, newEmp]);
     setNewEmpName("");
-    setNewEmpRole("");
+    setCustomRoleInput("");
+    setShowCustomRole(false);
 
     try {
       const res = await fetch("/api/employees", {
@@ -187,6 +234,32 @@ export default function AttendanceTracker() {
     }
   };
 
+  const markAllPresent = async () => {
+    const dateStr = fmtDate(selectedDate);
+    const nextAtt = { ...attendance };
+
+    employees.forEach(emp => {
+      const key = `${emp.id}__${dateStr}`;
+      nextAtt[key] = { status: "present", site: nextAtt[key]?.site || "" };
+    });
+
+    setAttendance(nextAtt);
+
+    try {
+      const res = await fetch("/api/mark-all-present", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dateStr })
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error);
+      fetchData(false);
+    } catch (e) {
+      setSaveError(true);
+      setSaveErrorMessage("Failed to mark all present.");
+    }
+  };
+
   const cycleStatus = (empId, dateStr) => {
     const key = `${empId}__${dateStr}`;
     const current = attendance[key]?.status ?? null;
@@ -212,6 +285,34 @@ export default function AttendanceTracker() {
   };
 
   const selectedDateStr = fmtDate(selectedDate);
+
+  // Today stats for summary meter
+  const todayStats = useMemo(() => {
+    let present = 0, absent = 0, leave = 0, half = 0, marked = 0;
+    employees.forEach(emp => {
+      const rec = attendance[`${emp.id}__${selectedDateStr}`];
+      if (rec) {
+        marked++;
+        if (rec.status === "present") present++;
+        else if (rec.status === "absent") absent++;
+        else if (rec.status === "leave") leave++;
+        else if (rec.status === "half") half++;
+      }
+    });
+    const total = employees.length;
+    const pct = total > 0 ? Math.round((marked / total) * 100) : 0;
+    return { present, absent, leave, half, marked, total, pct };
+  }, [attendance, employees, selectedDateStr]);
+
+  // Filtered employees list based on filter chip
+  const filteredEmployees = useMemo(() => {
+    if (filterStatus === "all") return employees;
+    return employees.filter(emp => {
+      const rec = attendance[`${emp.id}__${selectedDateStr}`];
+      if (filterStatus === "unmarked") return !rec;
+      return rec?.status === filterStatus;
+    });
+  }, [employees, attendance, selectedDateStr, filterStatus]);
 
   const monthDays = useMemo(() => {
     const y = registerMonth.getFullYear();
@@ -350,7 +451,7 @@ export default function AttendanceTracker() {
     return (
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100vh" }}>
         <Loader2 size={28} style={{ animation: "spin 1s linear infinite", marginBottom: 12, color: "#0f172a" }} />
-        <span style={{ fontSize: 14, color: "#64748b", fontWeight: 600 }}>Opening Attendance Register...</span>
+        <span style={{ fontSize: 14, color: "#64748b", fontWeight: 600 }}>Loading Attendance Register...</span>
       </div>
     );
   }
@@ -358,7 +459,7 @@ export default function AttendanceTracker() {
   return (
     <div className="app-container">
       
-      {/* Sticky Full-Width Header */}
+      {/* Sticky Top Header */}
       <header className="top-header">
         <div className="header-inner">
           <div className="header-brand">
@@ -368,7 +469,7 @@ export default function AttendanceTracker() {
             </span>
           </div>
 
-          {/* Segmented Navigation Bar */}
+          {/* Nav Pills */}
           <nav className="segmented-nav">
             <button className={`nav-pill ${tab === "today" ? "active" : ""}`} onClick={() => setTab("today")}>
               <CalendarDays size={16} /> Mark Attendance
@@ -398,6 +499,7 @@ export default function AttendanceTracker() {
         {/* Tab 1: Mark Attendance */}
         {tab === "today" && (
           <div>
+            {/* Date Navigator */}
             <div className="date-bar">
               <div className="date-selector">
                 <button className="icon-btn" onClick={() => setSelectedDate(new Date(selectedDate.getTime() - 86400000))}>
@@ -416,13 +518,58 @@ export default function AttendanceTracker() {
               </button>
             </div>
 
+            {/* Attendance Progress Meter & 1-Tap Mark All */}
+            {employees.length > 0 && (
+              <div className="summary-meter-card">
+                <div className="meter-header">
+                  <span className="meter-title">Today's Team Progress</span>
+                  <span className="meter-stat">{todayStats.marked} / {todayStats.total} Marked ({todayStats.pct}%)</span>
+                </div>
+
+                <div className="progress-bar-bg">
+                  <div className="progress-fill-present" style={{ width: `${(todayStats.present / (todayStats.total || 1)) * 100}%` }} title={`Present: ${todayStats.present}`} />
+                  <div className="progress-fill-absent" style={{ width: `${(todayStats.absent / (todayStats.total || 1)) * 100}%` }} title={`Absent: ${todayStats.absent}`} />
+                  <div className="progress-fill-leave" style={{ width: `${(todayStats.leave / (todayStats.total || 1)) * 100}%` }} title={`Leave: ${todayStats.leave}`} />
+                  <div className="progress-fill-half" style={{ width: `${(todayStats.half / (todayStats.total || 1)) * 100}%` }} title={`Half Day: ${todayStats.half}`} />
+                </div>
+
+                <div className="quick-actions-bar">
+                  <button className="btn-mark-all" onClick={markAllPresent}>
+                    <CheckCheck size={16} /> Mark All Present
+                  </button>
+
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                    {["all", "unmarked", "present", "absent"].map((st) => (
+                      <button
+                        key={st}
+                        style={{
+                          fontSize: 12,
+                          fontWeight: 600,
+                          padding: "4px 10px",
+                          borderRadius: 8,
+                          border: "1px solid #e2e8f0",
+                          background: filterStatus === st ? "#0f172a" : "#ffffff",
+                          color: filterStatus === st ? "#ffffff" : "#64748b",
+                          cursor: "pointer",
+                          textTransform: "capitalize"
+                        }}
+                        onClick={() => setFilterStatus(st)}
+                      >
+                        {st}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Quick Add Employee Card if no employees */}
             {employees.length === 0 ? (
               <div className="add-emp-card" style={{ textAlign: "center", padding: "36px 20px" }}>
-                <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 6, color: "#0f172a" }}>No Employees Added Yet</div>
-                <div style={{ fontSize: 13, color: "#64748b", marginBottom: 20 }}>Add your first team member to start taking attendance</div>
+                <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 6, color: "#0f172a" }}>No Employees Added Yet</div>
+                <div style={{ fontSize: 13, color: "#64748b", marginBottom: 20 }}>Select a role and add team members to start marking attendance</div>
 
-                <div className="add-emp-grid" style={{ maxWidth: 600, margin: "0 auto" }}>
+                <div className="add-emp-grid" style={{ maxWidth: 650, margin: "0 auto" }}>
                   <input
                     className="input-box"
                     placeholder="Employee name (e.g. Hassan)"
@@ -430,20 +577,41 @@ export default function AttendanceTracker() {
                     onChange={(e) => setNewEmpName(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && addEmployee()}
                   />
-                  <input
-                    className="input-box"
-                    placeholder="Role (e.g. Staff)"
-                    value={newEmpRole}
-                    onChange={(e) => setNewEmpRole(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && addEmployee()}
-                  />
+
+                  {!showCustomRole ? (
+                    <select
+                      className="select-box"
+                      value={selectedRole}
+                      onChange={(e) => {
+                        if (e.target.value === "__NEW__") {
+                          setShowCustomRole(true);
+                        } else {
+                          setSelectedRole(e.target.value);
+                        }
+                      }}
+                    >
+                      {rolesList.map((r) => (
+                        <option key={r} value={r}>{r}</option>
+                      ))}
+                      <option value="__NEW__">+ Add Custom Role...</option>
+                    </select>
+                  ) : (
+                    <input
+                      className="input-box"
+                      placeholder="Type custom role title..."
+                      value={customRoleInput}
+                      onChange={(e) => setCustomRoleInput(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && addEmployee()}
+                    />
+                  )}
+
                   <button className="primary-add-btn" onClick={addEmployee}>
                     <Plus size={18} /> Add Employee
                   </button>
                 </div>
               </div>
             ) : (
-              employees.map((emp) => {
+              filteredEmployees.map((emp) => {
                 const key = `${emp.id}__${selectedDateStr}`;
                 const rec = attendance[key];
                 const currentStatus = rec?.status;
@@ -451,42 +619,59 @@ export default function AttendanceTracker() {
 
                 return (
                   <div className="emp-item-card" key={emp.id}>
-                    <div className="emp-avatar-group">
-                      <div className="emp-avatar">{initial}</div>
-                      <div>
-                        <div className="emp-name-text">{emp.name}</div>
-                        <div className="emp-role-text">{emp.role}</div>
+                    <div className="emp-item-header">
+                      <div className="emp-avatar-group">
+                        <div className="emp-avatar">{initial}</div>
+                        <div>
+                          <div className="emp-name-text">{emp.name}</div>
+                          <span className="emp-role-badge">{emp.role}</span>
+                        </div>
                       </div>
                     </div>
 
-                    <div className="emp-item-right">
-                      {currentStatus === "present" && (
+                    {/* Interactive Status Chips */}
+                    <div className="status-chips-grid">
+                      {["present", "absent", "leave", "half"].map((s) => {
+                        const meta = STATUS[s];
+                        const isActive = currentStatus === s;
+                        return (
+                          <button
+                            key={s}
+                            className={`status-chip ${isActive ? `chip-${s}` : ""}`}
+                            onClick={() => setStatus(emp.id, selectedDateStr, isActive ? null : s)}
+                          >
+                            <span>{meta.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Site Location Field for Present */}
+                    {currentStatus === "present" && (
+                      <div className="site-input-container">
                         <input
                           className="site-field"
-                          placeholder="Office / Client site"
+                          placeholder="Office / Client location (optional)"
                           value={siteDrafts[key] ?? rec?.site ?? ""}
                           onChange={(e) => setSiteDrafts({ ...siteDrafts, [key]: e.target.value })}
                           onBlur={(e) => setStatus(emp.id, selectedDateStr, "present", e.target.value)}
                         />
-                      )}
-
-                      <div className="status-pill-group">
-                        {["present", "absent", "leave", "half"].map((s) => {
-                          const meta = STATUS[s];
-                          const isActive = currentStatus === s;
-                          return (
+                        <div className="site-quick-pills">
+                          {["Office / HQ", "Client Site", "Work From Home"].map((siteOpt) => (
                             <button
-                              key={s}
-                              className={`status-pill ${isActive ? `active-${meta.short}` : ""}`}
-                              title={meta.label}
-                              onClick={() => setStatus(emp.id, selectedDateStr, isActive ? null : s)}
+                              key={siteOpt}
+                              className="site-pill"
+                              onClick={() => {
+                                setSiteDrafts({ ...siteDrafts, [key]: siteOpt });
+                                setStatus(emp.id, selectedDateStr, "present", siteOpt);
+                              }}
                             >
-                              {meta.short}
+                              {siteOpt}
                             </button>
-                          );
-                        })}
+                          ))}
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
                 );
               })
@@ -547,6 +732,7 @@ export default function AttendanceTracker() {
                       <tr key={emp.id}>
                         <td className="sticky-name">
                           <div style={{ fontWeight: 700, color: "#0f172a" }}>{emp.name}</div>
+                          <div style={{ fontSize: 11, color: "#64748b" }}>{emp.role}</div>
                         </td>
                         {monthDays.map((day) => {
                           const ds = fmtDate(new Date(registerMonth.getFullYear(), registerMonth.getMonth(), day));
@@ -579,10 +765,10 @@ export default function AttendanceTracker() {
           </div>
         )}
 
-        {/* Tab 3: Employees */}
+        {/* Tab 3: Employees Management */}
         {tab === "employees" && (
           <div>
-            {/* Dedicated Prominent Add Employee Card */}
+            {/* Prominent Add Employee Card with Role Dropdown */}
             <div className="add-emp-card">
               <div className="add-emp-title">+ Add New Employee</div>
               <div className="add-emp-grid">
@@ -593,13 +779,37 @@ export default function AttendanceTracker() {
                   onChange={(e) => setNewEmpName(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && addEmployee()}
                 />
-                <input
-                  className="input-box"
-                  placeholder="Role (e.g. Audit Associate)"
-                  value={newEmpRole}
-                  onChange={(e) => setNewEmpRole(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && addEmployee()}
-                />
+
+                {!showCustomRole ? (
+                  <select
+                    className="select-box"
+                    value={selectedRole}
+                    onChange={(e) => {
+                      if (e.target.value === "__NEW__") {
+                        setShowCustomRole(true);
+                      } else {
+                        setSelectedRole(e.target.value);
+                      }
+                    }}
+                  >
+                    {rolesList.map((r) => (
+                      <option key={r} value={r}>{r}</option>
+                    ))}
+                    <option value="__NEW__">+ Add Custom Role...</option>
+                  </select>
+                ) : (
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <input
+                      className="input-box"
+                      placeholder="Custom role title..."
+                      value={customRoleInput}
+                      onChange={(e) => setCustomRoleInput(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && addEmployee()}
+                    />
+                    <button className="today-btn" onClick={() => setShowCustomRole(false)}>✕</button>
+                  </div>
+                )}
+
                 <button className="primary-add-btn" onClick={addEmployee}>
                   <Plus size={18} /> Add Employee
                 </button>
@@ -615,12 +825,12 @@ export default function AttendanceTracker() {
               employees.map((emp) => {
                 const initial = emp.name ? emp.name.charAt(0).toUpperCase() : "?";
                 return (
-                  <div className="emp-item-card" key={emp.id}>
+                  <div className="emp-item-card" key={emp.id} style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
                     <div className="emp-avatar-group">
                       <div className="emp-avatar">{initial}</div>
                       <div>
                         <div className="emp-name-text">{emp.name}</div>
-                        <div className="emp-role-text">{emp.role}</div>
+                        <span className="emp-role-badge">{emp.role}</span>
                       </div>
                     </div>
 
