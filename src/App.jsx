@@ -128,6 +128,16 @@ export default function App() {
     return () => { clearInterval(iv); window.removeEventListener("focus", onFocus); };
   }, [fetchData]);
 
+  // Helper for safe JSON fetching
+  const safeFetchJson = async (url, options) => {
+    const res = await fetch(url, options);
+    const contentType = res.headers.get("content-type") || "";
+    if (!res.ok || !contentType.includes("application/json")) {
+      throw new Error(`Server error (${res.status}). Please verify backend service.`);
+    }
+    return res.json();
+  };
+
   // ── Auth handlers ────────────────────────────────────────────────────────────
 
   // LOGIN — check email & password via DB
@@ -139,19 +149,18 @@ export default function App() {
     if (!password) return setAuthError("Please enter your password.");
     setAuthError(""); setAuthSuccess(""); setAuthLoading(true);
     try {
-      const res  = await fetch("/api/login", {
+      const data = await safeFetchJson("/api/login", {
         method:"POST", headers:{"Content-Type":"application/json"},
         body: JSON.stringify({ email, password })
       });
-      const data = await res.json();
       if (!data.success) {
         setAuthError(data.error || "Login failed.");
         return;
       }
       setCurrentUser(data.user);
       localStorage.setItem("adm-user", JSON.stringify(data.user));
-    } catch {
-      setAuthError("Something went wrong. Please try again.");
+    } catch (err) {
+      setAuthError(err.message || "Something went wrong. Please try again.");
     } finally { setAuthLoading(false); }
   };
 
@@ -166,15 +175,14 @@ export default function App() {
     if (!password) return setAuthError("Please create a password.");
     setAuthError(""); setAuthSuccess(""); setAuthLoading(true);
     try {
-      const res  = await fetch("/api/send-otp", {
+      const data = await safeFetchJson("/api/send-otp", {
         method:"POST", headers:{"Content-Type":"application/json"},
         body: JSON.stringify({ email, name })
       });
-      const data = await res.json();
-      if (!data.success) throw new Error(data.error||"Failed to send");
+      if (!data.success) throw new Error(data.error||"Failed to send verification code");
       setAuthStep("verify");
       setCooldown(60);
-    } catch (err) { setAuthError(err.message);
+    } catch (err) { setAuthError(err.message || "Failed to send code.");
     } finally { setAuthLoading(false); }
   };
 
@@ -184,11 +192,10 @@ export default function App() {
     if (otp.replace(/\D/g,"").length < 6) return setAuthError("Enter the 6-digit code.");
     setAuthError(""); setAuthSuccess(""); setAuthLoading(true);
     try {
-      const res  = await fetch("/api/verify-otp", {
+      const data = await safeFetchJson("/api/verify-otp", {
         method:"POST", headers:{"Content-Type":"application/json"},
         body: JSON.stringify({ email: signupEmail.trim(), otp: otp.trim() })
       });
-      const data = await res.json();
       if (!data.success) throw new Error(data.error||"Verification failed");
 
       const user = {
@@ -206,7 +213,7 @@ export default function App() {
 
       setCurrentUser(user);
       localStorage.setItem("adm-user", JSON.stringify(user));
-    } catch (err) { setAuthError(err.message);
+    } catch (err) { setAuthError(err.message || "Verification error.");
     } finally { setAuthLoading(false); }
   };
 
@@ -217,15 +224,14 @@ export default function App() {
     if (!email || !email.includes("@")) return setAuthError("Please enter a valid email.");
     setAuthError(""); setAuthSuccess(""); setAuthLoading(true);
     try {
-      const res  = await fetch("/api/send-reset-otp", {
+      const data = await safeFetchJson("/api/send-reset-otp", {
         method:"POST", headers:{"Content-Type":"application/json"},
         body: JSON.stringify({ email })
       });
-      const data = await res.json();
       if (!data.success) throw new Error(data.error || "Failed to send reset code.");
       setForgotStep("verify");
       setCooldown(60);
-    } catch (err) { setAuthError(err.message);
+    } catch (err) { setAuthError(err.message || "Failed to send reset code.");
     } finally { setAuthLoading(false); }
   };
 
@@ -236,7 +242,7 @@ export default function App() {
     if (!forgotNewPassword.trim()) return setAuthError("Please enter a new password.");
     setAuthError(""); setAuthSuccess(""); setAuthLoading(true);
     try {
-      const res  = await fetch("/api/reset-password", {
+      const data = await safeFetchJson("/api/reset-password", {
         method:"POST", headers:{"Content-Type":"application/json"},
         body: JSON.stringify({
           email: forgotEmail.trim(),
@@ -244,15 +250,15 @@ export default function App() {
           newPassword: forgotNewPassword.trim()
         })
       });
-      const data = await res.json();
       if (!data.success) throw new Error(data.error || "Reset failed.");
 
       setAuthSuccess("Password updated successfully! Please login with your new password.");
       setAuthTab("login"); setForgotStep("form");
       setForgotEmail(""); setForgotOtp(""); setForgotNewPassword("");
-    } catch (err) { setAuthError(err.message);
+    } catch (err) { setAuthError(err.message || "Reset failed.");
     } finally { setAuthLoading(false); }
   };
+
 
   const handleLogout = () => {
     setCurrentUser(null);
