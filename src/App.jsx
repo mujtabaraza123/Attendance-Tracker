@@ -173,6 +173,12 @@ export default function App() {
     if (!name)  return setAuthError("Please enter your name.");
     if (!email || !email.includes("@")) return setAuthError("Please enter a valid email.");
     if (!password) return setAuthError("Please create a password.");
+
+    // Check if email already registered in loaded list
+    if (employees.some(emp => emp.email && emp.email.toLowerCase().trim() === email.toLowerCase())) {
+      return setAuthError("An account with this email already exists. Please log in.");
+    }
+
     setAuthError(""); setAuthSuccess(""); setAuthLoading(true);
     try {
       const data = await safeFetchJson("/api/send-otp", {
@@ -319,10 +325,21 @@ export default function App() {
   // ── Employees ────────────────────────────────────────────────────────────────
   const addEmployee = async () => {
     if (!newName.trim()) return;
+    const cleanEmail = newEmail.trim().toLowerCase();
+    if (cleanEmail && employees.some(e => e.email && e.email.toLowerCase().trim() === cleanEmail)) {
+      setAppErr("An employee with this email already exists.");
+      return;
+    }
     const emp = { id:uid(), name:newName.trim(), email:newEmail.trim(), role:newRole };
     setEmployees(prev=>[...prev,emp]);
     setNewName(""); setNewEmail("");
-    try { await fetch("/api/employees",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(emp)}); fetchData(false);
+    try {
+      const res = await fetch("/api/employees",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(emp)});
+      const data = await res.json();
+      if (!data.success) {
+        setAppErr(data.error || "Failed to save employee.");
+      }
+      fetchData(false);
     } catch { setAppErr("Failed to save employee."); }
   };
 

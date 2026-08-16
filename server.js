@@ -100,20 +100,34 @@ async function initDb() {
 
 initDb();
 
-// POST /api/send-otp — send OTP to email
+// POST /api/send-otp — send OTP to email for signup
 app.post('/api/send-otp', async (req, res) => {
   const { email, name } = req.body;
   if (!email) return res.status(400).json({ success: false, error: 'Email is required' });
 
-  const otp = String(Math.floor(100000 + Math.random() * 900000));
-  const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
-
-  otpStore.set(email.toLowerCase().trim(), { otp, expiresAt });
+  const cleanEmail = email.toLowerCase().trim();
 
   try {
+    // Check if account with this email already exists in DB
+    const existing = await pool.query(
+      `SELECT id FROM public.employees WHERE LOWER(email) = LOWER($1);`,
+      [cleanEmail]
+    );
+    if (existing.rows.length > 0) {
+      return res.json({
+        success: false,
+        error: 'An account with this email already exists. Please log in.'
+      });
+    }
+
+    const otp = String(Math.floor(100000 + Math.random() * 900000));
+    const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
+
+    otpStore.set(cleanEmail, { otp, expiresAt });
+
     await transporter.sendMail({
       from: '"Attendance Tracker" <no.auth.verify@gmail.com>',
-      to: email,
+      to: cleanEmail,
       subject: `Your Verification Code — ${otp}`,
       html: `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;max-width:400px;margin:0 auto;padding:32px 16px;background:#f8fafc;"><div style="background:#ffffff;border-radius:14px;padding:32px 24px;border:1px solid #e2e8f0;text-align:center;"><div style="font-size:16px;font-weight:800;color:#0f172a;letter-spacing:-0.3px;margin-bottom:4px;">Attendance Tracker</div><div style="font-size:12px;color:#64748b;margin-bottom:20px;font-weight:500;">Verification Code</div><p style="font-size:13px;color:#334155;margin:0 0 12px;text-align:left;">Hi <strong>${name || 'there'}</strong>,</p><p style="font-size:13px;color:#64748b;margin:0 0 18px;text-align:left;">Your 6-digit verification code is:</p><div style="background:#0f172a;color:#ffffff;border-radius:10px;padding:14px 20px;font-size:28px;font-weight:800;letter-spacing:8px;font-family:monospace;display:inline-block;margin:4px 0 18px;">${otp}</div><p style="font-size:11px;color:#94a3b8;margin:10px 0 0;line-height:1.5;">Expires in 10 minutes. If you didn't request this, ignore this email.</p></div></div>`,
     });
@@ -268,9 +282,20 @@ app.post('/api/employees', async (req, res) => {
   if (!id || !name) return res.status(400).json({ error: "Missing id or name" });
 
   try {
+    if (email && email.trim()) {
+      const cleanEmail = email.toLowerCase().trim();
+      const existing = await pool.query(
+        `SELECT id FROM public.employees WHERE LOWER(email) = LOWER($1) AND id != $2;`,
+        [cleanEmail, id]
+      );
+      if (existing.rows.length > 0) {
+        return res.status(400).json({ success: false, error: 'An account with this email already exists.' });
+      }
+    }
+
     await pool.query(
       `INSERT INTO public.employees (id, name, email, password, role) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, email = EXCLUDED.email, password = EXCLUDED.password, role = EXCLUDED.role;`,
-      [id, name, email || '', password || '', role || 'Staff']
+      [id, name, email ? email.trim() : '', password ? password.trim() : '', role || 'Staff']
     );
     res.json({ success: true });
   } catch (err) {
