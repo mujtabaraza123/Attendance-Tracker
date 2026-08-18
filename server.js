@@ -13,11 +13,11 @@ app.use(cors());
 app.use(express.json());
 
 const pool = new Pool({
-  host: process.env.DB_HOST || 'aws-0-ap-southeast-1.pooler.supabase.com',
+  host: process.env.DB_HOST || 'aws-0-us-east-1.pooler.supabase.com',
   port: parseInt(process.env.DB_PORT || '6543'),
   database: process.env.DB_NAME || 'postgres',
-  user: process.env.DB_USER || 'postgres.tdnbheftrtcwnhejyvgc',
-  password: process.env.DB_PASSWORD || 'Hammad519..',
+  user: process.env.DB_USER || 'postgres.ncaxstitiadvltbwfgxv',
+  password: process.env.DB_PASSWORD || '052131!razashah',
   ssl: { rejectUnauthorized: false },
   max: 10,
   idleTimeoutMillis: 30000,
@@ -30,8 +30,8 @@ const otpStore = new Map();
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
-    user: process.env.GMAIL_USER || 'no.auth.verify@gmail.com',
-    pass: process.env.GMAIL_APP_PASSWORD || 'yzgl ngmr mqvt rccf',
+    user: process.env.GMAIL_USER || 'razamujtaba714@gmail.com',
+    pass: process.env.GMAIL_APP_PASSWORD || 'moeo mroy egxv lulh',
   },
 });
 
@@ -95,7 +95,7 @@ async function initDb() {
       for (const role of defaultRoles) {
         const id = role.toLowerCase().replace(/[^a-z0-9]/g, '_');
         await client.query(
-          `INSERT INTO public.roles (id, title) VALUES ($1, $2) ON CONFLICT DO NOTHING;`,
+          `INSERT INTO public.roles (id, title) VALUES ($1, $2) ON CONFLICT (id) DO NOTHING;`,
           [id, role]
         );
       }
@@ -144,7 +144,7 @@ app.post('/api/send-otp', async (req, res) => {
     }
 
     await transporter.sendMail({
-      from: '"Attendance Tracker" <no.auth.verify@gmail.com>',
+      from: '"Attendance Tracker" <razamujtaba714@gmail.com>',
       to: cleanEmail,
       subject: `Your Verification Code — ${otp}`,
       html: `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;max-width:400px;margin:0 auto;padding:32px 16px;background:#f8fafc;"><div style="background:#ffffff;border-radius:14px;padding:32px 24px;border:1px solid #e2e8f0;text-align:center;"><div style="font-size:16px;font-weight:800;color:#0f172a;letter-spacing:-0.3px;margin-bottom:4px;">Attendance Tracker</div><div style="font-size:12px;color:#64748b;margin-bottom:20px;font-weight:500;">Verification Code</div><p style="font-size:13px;color:#334155;margin:0 0 12px;text-align:left;">Hi <strong>${name || 'there'}</strong>,</p><p style="font-size:13px;color:#64748b;margin:0 0 18px;text-align:left;">Your 6-digit verification code is:</p><div style="background:#0f172a;color:#ffffff;border-radius:10px;padding:14px 20px;font-size:28px;font-weight:800;letter-spacing:8px;font-family:monospace;display:inline-block;margin:4px 0 18px;">${otp}</div><p style="font-size:11px;color:#94a3b8;margin:10px 0 0;line-height:1.5;">Expires in 10 minutes. If you didn't request this, ignore this email.</p></div></div>`,
@@ -221,7 +221,7 @@ app.post('/api/send-reset-otp', async (req, res) => {
     }
 
     await transporter.sendMail({
-      from: '"Attendance Tracker" <no.auth.verify@gmail.com>',
+      from: '"Attendance Tracker" <razamujtaba714@gmail.com>',
       to: cleanEmail,
       subject: `Password Reset Code — ${otp}`,
       html: `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;max-width:400px;margin:0 auto;padding:32px 16px;background:#f8fafc;"><div style="background:#ffffff;border-radius:14px;padding:32px 24px;border:1px solid #e2e8f0;text-align:center;"><div style="font-size:16px;font-weight:800;color:#0f172a;letter-spacing:-0.3px;margin-bottom:4px;">Attendance Tracker</div><div style="font-size:12px;color:#64748b;margin-bottom:20px;font-weight:500;">Password Reset Code</div><p style="font-size:13px;color:#334155;margin:0 0 12px;text-align:left;">Hi <strong>${userName || 'there'}</strong>,</p><p style="font-size:13px;color:#64748b;margin:0 0 18px;text-align:left;">Your password reset code is:</p><div style="background:#0f172a;color:#ffffff;border-radius:10px;padding:14px 20px;font-size:28px;font-weight:800;letter-spacing:8px;font-family:monospace;display:inline-block;margin:4px 0 18px;">${otp}</div><p style="font-size:11px;color:#94a3b8;margin:10px 0 0;line-height:1.5;">Expires in 10 minutes. If you didn't request a password reset, ignore this email.</p></div></div>`,
