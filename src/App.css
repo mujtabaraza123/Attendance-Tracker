@@ -576,6 +576,114 @@ input, button { font-family: inherit; }
   box-shadow: 0 1px 2px rgba(0,0,0,.05);
 }
 
+/* ── Attendance Time Stamp Badges ── */
+.my-att-time {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--m);
+  background: var(--bg);
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--bd);
+}
+.emp-time {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--m);
+  margin-top: 3px;
+}
+
+/* ── Profile Edit Form ── */
+.profile-edit-box {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-top: 10px;
+  border-top: 1px solid var(--bg);
+}
+.profile-edit-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+}
+.profile-edit-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.profile-edit-field.full {
+  grid-column: 1 / -1;
+}
+.profile-edit-field label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  color: var(--m);
+}
+.profile-edit-field input, .profile-edit-field select {
+  padding: 9px 12px;
+  border: 1px solid var(--bd);
+  border-radius: 8px;
+  font-size: 13px;
+  background: var(--bg);
+  outline: none;
+  font-family: inherit;
+  color: var(--c);
+}
+.profile-edit-field input:focus, .profile-edit-field select:focus {
+  border-color: #0f172a;
+  background: var(--wh);
+}
+.profile-pwd-divider {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--m);
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  margin: 6px 0 2px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.profile-pwd-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--bd);
+}
+.profile-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 6px;
+}
+.profile-feedback {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 8px 12px;
+  border-radius: 8px;
+}
+.profile-feedback.success {
+  background: #f0fdf4;
+  color: #16a34a;
+  border: 1px solid #bbf7d0;
+}
+.profile-feedback.error {
+  background: #fef2f2;
+  color: #ef4444;
+  border: 1px solid #fecaca;
+}
+
 /* ── Mobile ─────────────────────────────────────────────── */
 @media (max-width: 600px) {
   /* Auth */

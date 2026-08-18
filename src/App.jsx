@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { ChevronLeft, ChevronRight, Plus, Trash2, Download, Building2, CheckCheck, Loader2, ArrowRight, LogOut, X, AlertCircle, User, Users, Calendar, Shield, MapPin, CheckCircle2, Clock, FileSpreadsheet } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Trash2, Download, Building2, CheckCheck, Loader2, ArrowRight, LogOut, X, AlertCircle, User, Users, Calendar, Shield, MapPin, CheckCircle2, Clock, FileSpreadsheet, Edit2, Save, Lock } from "lucide-react";
 import * as XLSX from "xlsx";
 import "./App.css";
 
@@ -26,6 +26,26 @@ function isEmailAdmin(email) {
 
 function fmtDate(d) {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+}
+function fmtTime(ts) {
+  if (!ts) return "";
+  try {
+    const d = new Date(ts);
+    if (isNaN(d.getTime())) return "";
+    return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
+  } catch {
+    return "";
+  }
+}
+function fmtDateTime(ts) {
+  if (!ts) return "";
+  try {
+    const d = new Date(ts);
+    if (isNaN(d.getTime())) return "";
+    return d.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", hour12: true });
+  } catch {
+    return "";
+  }
 }
 function monthLabel(d) {
   return d.toLocaleDateString("en-US",{month:"long",year:"numeric"});
@@ -102,6 +122,16 @@ export default function App() {
   const [newEmail, setNewEmail] = useState("");
   const [newRole,  setNewRole]  = useState(DEFAULT_ROLES[0]);
   const [confirmClear, setConfirmClear] = useState(false);
+
+  // Edit Profile form state
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [editName,         setEditName]         = useState("");
+  const [editEmail,        setEditEmail]        = useState("");
+  const [editRole,         setEditRole]         = useState("");
+  const [editCurrentPwd,   setEditCurrentPwd]   = useState("");
+  const [editNewPwd,       setEditNewPwd]       = useState("");
+  const [profileSaving,    setProfileSaving]    = useState(false);
+  const [profileMsg,       setProfileMsg]       = useState({ text: "", type: "" });
 
   // ── Cooldown timer ───────────────────────────────────────────────────────────
   useEffect(() => {
@@ -328,8 +358,9 @@ export default function App() {
     const key  = `${empId}__${dateStr}`;
     const next = { ...attendance };
     const curSite = site !== undefined ? site : (next[key]?.site || "");
+    const nowIso = new Date().toISOString();
     if (status === null) delete next[key];
-    else next[key] = { status, site: curSite };
+    else next[key] = { status, site: curSite, updatedAt: nowIso };
     setAttendance(next);
     try {
       const res  = await fetch("/api/attendance", {
@@ -338,8 +369,74 @@ export default function App() {
       });
       const d = await res.json();
       if (!d.success) throw new Error(d.error);
-      fetchData(false);
+      if (d.updatedAt) {
+        setAttendance(prev => ({
+          ...prev,
+          [key]: { status, site: curSite, updatedAt: d.updatedAt }
+        }));
+      }
     } catch (err) { setAppErr("Sync error: "+err.message); }
+  };
+
+  // ── Profile Update ───────────────────────────────────────────────────────────
+  const startEditProfile = () => {
+    setEditName(myEmployee?.name || currentUser?.name || "");
+    setEditEmail(currentUser?.email || myEmployee?.email || "");
+    setEditRole(myEmployee?.role || currentUser?.role || DEFAULT_ROLES[0]);
+    setEditCurrentPwd("");
+    setEditNewPwd("");
+    setProfileMsg({ text: "", type: "" });
+    setIsEditingProfile(true);
+  };
+
+  const handleUpdateProfile = async (e) => {
+    e?.preventDefault();
+    if (!editName.trim()) {
+      setProfileMsg({ text: "Name cannot be empty.", type: "error" });
+      return;
+    }
+    setProfileSaving(true);
+    setProfileMsg({ text: "", type: "" });
+    try {
+      const res = await safeFetchJson("/api/update-profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: myEmpId,
+          name: editName.trim(),
+          email: editEmail.trim(),
+          role: editRole,
+          currentPassword: editCurrentPwd,
+          newPassword: editNewPwd
+        })
+      });
+      if (!res.success) throw new Error(res.error || "Failed to update profile.");
+
+      const updatedUser = {
+        ...currentUser,
+        name: res.user.name,
+        email: res.user.email,
+        role: res.user.role
+      };
+      setCurrentUser(updatedUser);
+      localStorage.setItem("adm-user", JSON.stringify(updatedUser));
+      
+      setEmployees(prev => prev.map(emp => 
+        emp.id === myEmpId 
+          ? { ...emp, name: res.user.name, email: res.user.email, role: res.user.role }
+          : emp
+      ));
+
+      setProfileMsg({ text: "Profile updated successfully!", type: "success" });
+      setTimeout(() => {
+        setIsEditingProfile(false);
+        setProfileMsg({ text: "", type: "" });
+      }, 1000);
+    } catch (err) {
+      setProfileMsg({ text: err.message || "Failed to update profile.", type: "error" });
+    } finally {
+      setProfileSaving(false);
+    }
   };
 
   const cycleStatus = (empId, dateStr) => {
@@ -826,23 +923,30 @@ export default function App() {
                   <div className="my-status-box">
                     <div className="my-status-header">
                       <span className="my-status-title">Status for {selDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
-                      {myTodayStatus ? (
-                        <span
-                          className="my-status-badge"
-                          style={{
-                            background: `${STATUS[myTodayStatus].color}15`,
-                            color: STATUS[myTodayStatus].color,
-                            border: `1px solid ${STATUS[myTodayStatus].color}40`
-                          }}
-                        >
-                          <span style={{ width: 7, height: 7, borderRadius: "50%", background: STATUS[myTodayStatus].color, display: "inline-block" }} />
-                          {STATUS[myTodayStatus].label} {myTodaySite ? `(${myTodaySite})` : ""}
-                        </span>
-                      ) : (
-                        <span className="my-status-badge" style={{ background: "#f1f5f9", color: "#64748b", border: "1px solid #cbd5e1" }}>
-                          Not marked
-                        </span>
-                      )}
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        {myTodayRec?.updatedAt && myTodayStatus && (
+                          <span className="my-att-time">
+                            <Clock size={11} /> {fmtTime(myTodayRec.updatedAt)}
+                          </span>
+                        )}
+                        {myTodayStatus ? (
+                          <span
+                            className="my-status-badge"
+                            style={{
+                              background: `${STATUS[myTodayStatus].color}15`,
+                              color: STATUS[myTodayStatus].color,
+                              border: `1px solid ${STATUS[myTodayStatus].color}40`
+                            }}
+                          >
+                            <span style={{ width: 7, height: 7, borderRadius: "50%", background: STATUS[myTodayStatus].color, display: "inline-block" }} />
+                            {STATUS[myTodayStatus].label} {myTodaySite ? `(${myTodaySite})` : ""}
+                          </span>
+                        ) : (
+                          <span className="my-status-badge" style={{ background: "#f1f5f9", color: "#64748b", border: "1px solid #cbd5e1" }}>
+                            Not marked
+                          </span>
+                        )}
+                      </div>
                     </div>
 
                     {/* Quick status buttons */}
@@ -976,6 +1080,11 @@ export default function App() {
                           <div>
                             <div className="emp-name">{emp.name} {emp.id === myEmpId ? "(You)" : ""}</div>
                             <div className="emp-role">{emp.role}</div>
+                            {rec?.updatedAt && cur && (
+                              <div className="emp-time">
+                                <Clock size={10} /> {fmtTime(rec.updatedAt)}
+                              </div>
+                            )}
                           </div>
                         </div>
                         <div className="status-btns">
@@ -1097,63 +1206,167 @@ export default function App() {
         {tab==="profile" && (
           <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
             <div className="profile-card">
-              <div className="profile-hdr">
-                <div className="profile-avatar">
-                  {(myEmployee?.name || currentUser?.name || "U").charAt(0).toUpperCase()}
+              <div className="row-between" style={{ alignItems: "center" }}>
+                <div className="profile-hdr">
+                  <div className="profile-avatar">
+                    {(myEmployee?.name || currentUser?.name || "U").charAt(0).toUpperCase()}
+                  </div>
+                  <div>
+                    <div className="profile-title">{myEmployee?.name || currentUser?.name}</div>
+                    <div className="profile-subtitle">{currentUser?.email || myEmployee?.email || "Personal Profile"}</div>
+                  </div>
                 </div>
-                <div>
-                  <div className="profile-title">{myEmployee?.name || currentUser?.name}</div>
-                  <div className="profile-subtitle">{currentUser?.email || myEmployee?.email || "Personal Profile"}</div>
-                </div>
+                {!isEditingProfile && (
+                  <button className="sm-btn" onClick={startEditProfile} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                    <Edit2 size={13} /> Edit Profile
+                  </button>
+                )}
               </div>
 
-              <div className="profile-details-grid">
-                <div className="profile-field">
-                  <span className="profile-field-lbl">Full Name</span>
-                  <span className="profile-field-val">{myEmployee?.name || currentUser?.name}</span>
-                </div>
-                <div className="profile-field">
-                  <span className="profile-field-lbl">Email Address</span>
-                  <span className="profile-field-val">{currentUser?.email || myEmployee?.email || "—"}</span>
-                </div>
-                <div className="profile-field">
-                  <span className="profile-field-lbl">Designation / Role</span>
-                  <span className="profile-field-val">{myEmployee?.role || currentUser?.role || "Staff"}</span>
-                </div>
-                <div className="profile-field">
-                  <span className="profile-field-lbl">Account ID</span>
-                  <span className="profile-field-val" style={{ fontFamily: "monospace", fontSize: 12 }}>{myEmpId || "—"}</span>
-                </div>
-                <div className="profile-field">
-                  <span className="profile-field-lbl">This Month Attendance</span>
-                  <span className="profile-field-val" style={{ color: "#16a34a", fontWeight: 700 }}>
-                    {myMonthSummary.pct == null ? "No records yet" : `${myMonthSummary.pct}% (${myMonthSummary.present} days present)`}
-                  </span>
-                </div>
-                <div className="profile-field">
-                  <span className="profile-field-lbl">All-Time Attendance Rate</span>
-                  <span className="profile-field-val" style={{ fontWeight: 700 }}>
-                    {myAllTimeSummary.pct}% ({myAllTimeSummary.totalMarked} days recorded)
-                  </span>
-                </div>
-              </div>
+              {/* View Mode */}
+              {!isEditingProfile && (
+                <>
+                  <div className="profile-details-grid">
+                    <div className="profile-field">
+                      <span className="profile-field-lbl">Full Name</span>
+                      <span className="profile-field-val">{myEmployee?.name || currentUser?.name}</span>
+                    </div>
+                    <div className="profile-field">
+                      <span className="profile-field-lbl">Email Address</span>
+                      <span className="profile-field-val">{currentUser?.email || myEmployee?.email || "—"}</span>
+                    </div>
+                    <div className="profile-field">
+                      <span className="profile-field-lbl">Designation / Role</span>
+                      <span className="profile-field-val">{myEmployee?.role || currentUser?.role || "Staff"}</span>
+                    </div>
+                    <div className="profile-field">
+                      <span className="profile-field-lbl">Account ID</span>
+                      <span className="profile-field-val" style={{ fontFamily: "monospace", fontSize: 12 }}>{myEmpId || "—"}</span>
+                    </div>
+                    <div className="profile-field">
+                      <span className="profile-field-lbl">This Month Attendance</span>
+                      <span className="profile-field-val" style={{ color: "#16a34a", fontWeight: 700 }}>
+                        {myMonthSummary.pct == null ? "No records yet" : `${myMonthSummary.pct}% (${myMonthSummary.present} days present)`}
+                      </span>
+                    </div>
+                    <div className="profile-field">
+                      <span className="profile-field-lbl">All-Time Attendance Rate</span>
+                      <span className="profile-field-val" style={{ fontWeight: 700 }}>
+                        {myAllTimeSummary.pct}% ({myAllTimeSummary.totalMarked} days recorded)
+                      </span>
+                    </div>
+                  </div>
 
-              {isAuthor && (
-                <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 8, padding: "11px 14px", display: "flex", alignItems: "center", gap: 10, fontSize: 12, fontWeight: 600, color: "#166534" }}>
-                  <Shield size={16} color="#16a34a" />
-                  <span>Author / Super Admin: Full administrative control, access to all employee attendance, team register, and management actions.</span>
-                </div>
+                  {isAuthor && (
+                    <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 8, padding: "11px 14px", display: "flex", alignItems: "center", gap: 10, fontSize: 12, fontWeight: 600, color: "#166534" }}>
+                      <Shield size={16} color="#16a34a" />
+                      <span>Author / Super Admin: Full administrative control, access to all employee attendance, team register, and management actions.</span>
+                    </div>
+                  )}
+
+                  <div className="row-between" style={{ marginTop: 8, paddingTop: 14, borderTop: "1px solid var(--bd)" }}>
+                    <span className="spill green">
+                      <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#16a34a", display: "inline-block" }} />
+                      Account Active
+                    </span>
+                    <button className="sm-btn red" onClick={handleLogout}>
+                      <LogOut size={12}/> Sign Out
+                    </button>
+                  </div>
+                </>
               )}
 
-              <div className="row-between" style={{ marginTop: 8, paddingTop: 14, borderTop: "1px solid var(--bd)" }}>
-                <span className="spill green">
-                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#16a34a", display: "inline-block" }} />
-                  Account Active
-                </span>
-                <button className="sm-btn red" onClick={handleLogout}>
-                  <LogOut size={12}/> Sign Out
-                </button>
-              </div>
+              {/* Edit Mode Form */}
+              {isEditingProfile && (
+                <form onSubmit={handleUpdateProfile} className="profile-edit-box">
+                  {profileMsg.text && (
+                    <div className={`profile-feedback ${profileMsg.type}`}>
+                      {profileMsg.type === "success" ? <CheckCircle2 size={14} /> : <AlertCircle size={14} />}
+                      <span>{profileMsg.text}</span>
+                    </div>
+                  )}
+
+                  <div className="profile-edit-grid">
+                    <div className="profile-edit-field">
+                      <label>Full Name *</label>
+                      <input
+                        type="text"
+                        value={editName}
+                        onChange={e => setEditName(e.target.value)}
+                        placeholder="Your full name"
+                        required
+                      />
+                    </div>
+
+                    <div className="profile-edit-field">
+                      <label>Email Address</label>
+                      <input
+                        type="email"
+                        value={editEmail}
+                        onChange={e => setEditEmail(e.target.value)}
+                        placeholder="your.email@example.com"
+                      />
+                    </div>
+
+                    <div className="profile-edit-field full">
+                      <label>Role / Designation</label>
+                      <select
+                        value={editRole}
+                        onChange={e => setEditRole(e.target.value)}
+                      >
+                        {rolesList.map(r => (
+                          <option key={r} value={r}>{r}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="profile-edit-field full">
+                      <div className="profile-pwd-divider">Change Password (Optional)</div>
+                    </div>
+
+                    <div className="profile-edit-field">
+                      <label>Current Password</label>
+                      <input
+                        type="password"
+                        value={editCurrentPwd}
+                        onChange={e => setEditCurrentPwd(e.target.value)}
+                        placeholder="Leave blank if not changing"
+                      />
+                    </div>
+
+                    <div className="profile-edit-field">
+                      <label>New Password</label>
+                      <input
+                        type="password"
+                        value={editNewPwd}
+                        onChange={e => setEditNewPwd(e.target.value)}
+                        placeholder="Minimum 6 characters"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="profile-actions">
+                    <button
+                      type="submit"
+                      className="sm-btn green"
+                      disabled={profileSaving}
+                      style={{ padding: "8px 16px", fontSize: 13, display: "inline-flex", alignItems: "center", gap: 6 }}
+                    >
+                      {profileSaving ? <Loader2 size={13} className="spin" /> : <Save size={13} />}
+                      {profileSaving ? "Saving to Database..." : "Save Changes"}
+                    </button>
+                    <button
+                      type="button"
+                      className="sm-btn"
+                      disabled={profileSaving}
+                      onClick={() => { setIsEditingProfile(false); setProfileMsg({ text: "", type: "" }); }}
+                      style={{ padding: "8px 16px", fontSize: 13 }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              )}
             </div>
           </div>
         )}

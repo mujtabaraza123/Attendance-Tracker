@@ -282,11 +282,11 @@ app.get('/api/all-data', async (req, res) => {
   try {
     const empRes = await pool.query(`SELECT id, name, email, role FROM public.employees ORDER BY created_at ASC;`);
     const roleRes = await pool.query(`SELECT id, title FROM public.roles ORDER BY title ASC;`);
-    const attRes = await pool.query(`SELECT id, employee_id, date, status, site FROM public.attendance;`);
+    const attRes = await pool.query(`SELECT id, employee_id, date, status, site, updated_at FROM public.attendance;`);
     
     const attendanceMap = {};
     attRes.rows.forEach(r => {
-      attendanceMap[r.id] = { status: r.status, site: r.site || '' };
+      attendanceMap[r.id] = { status: r.status, site: r.site || '', updatedAt: r.updated_at };
     });
 
     res.json({
@@ -392,17 +392,66 @@ app.post('/api/attendance', async (req, res) => {
   try {
     if (status === null) {
       await pool.query(`DELETE FROM public.attendance WHERE id = $1;`, [id]);
+      res.json({ success: true, updatedAt: null });
     } else {
-      await pool.query(
+      const result = await pool.query(
         `INSERT INTO public.attendance (id, employee_id, date, status, site, updated_at) 
          VALUES ($1, $2, $3, $4, $5, NOW()) 
-         ON CONFLICT (id) DO UPDATE SET status = EXCLUDED.status, site = EXCLUDED.site, updated_at = NOW();`,
+         ON CONFLICT (id) DO UPDATE SET status = EXCLUDED.status, site = EXCLUDED.site, updated_at = NOW()
+         RETURNING updated_at;`,
         [id, empId, dateStr, status, site || '']
       );
+      const updatedAt = result.rows[0]?.updated_at || new Date().toISOString();
+      res.json({ success: true, updatedAt });
     }
-    res.json({ success: true });
   } catch (err) {
     console.error("Error updating attendance:", err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/update-profile — edit profile details (name, email, role, password)
+app.post('/api/update-profile', async (req, res) => {
+  const { id, name, email, role, currentPassword, newPassword } = req.body;
+  if (!id || !name) {
+    return res.status(400).json({ success: false, error: 'User ID and name are required' });
+  }
+
+  const cleanEmail = email ? email.toLowerCase().trim() : '';
+
+  try {
+    if (cleanEmail) {
+      const existing = await pool.query(
+        `SELECT id FROM public.employees WHERE LOWER(email) = LOWER($1) AND id != $2;`,
+        [cleanEmail, id]
+      );
+      if (existing.rows.length > 0) {
+        return res.json({ success: false, error: 'This email is already registered to another account.' });
+      }
+    }
+
+    if (newPassword && newPassword.trim()) {
+      const userCheck = await pool.query(`SELECT password FROM public.employees WHERE id = $1;`, [id]);
+      if (userCheck.rows.length > 0 && userCheck.rows[0].password) {
+        if (userCheck.rows[0].password !== (currentPassword || '').trim()) {
+          return res.json({ success: false, error: 'Current password is incorrect.' });
+        }
+      }
+      await pool.query(
+        `UPDATE public.employees SET name = $1, email = $2, role = $3, password = $4 WHERE id = $5;`,
+        [name.trim(), cleanEmail, role || 'Staff', newPassword.trim(), id]
+      );
+    } else {
+      await pool.query(
+        `UPDATE public.employees SET name = $1, email = $2, role = $3 WHERE id = $4;`,
+        [name.trim(), cleanEmail, role || 'Staff', id]
+      );
+    }
+
+    const updatedUser = await pool.query(`SELECT id, name, email, role FROM public.employees WHERE id = $1;`, [id]);
+    res.json({ success: true, user: updatedUser.rows[0] });
+  } catch (err) {
+    console.error("Error updating profile:", err.message);
     res.status(500).json({ success: false, error: err.message });
   }
 });
