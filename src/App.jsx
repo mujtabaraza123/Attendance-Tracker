@@ -12,6 +12,17 @@ const STATUS = {
 };
 const STATUS_CYCLE = ["present","absent","leave","half",null];
 const DEFAULT_ROLES = ["Audit Associate","Senior Associate","Assistant Manager","Manager","Partner","Trainee","Staff"];
+const ADMIN_EMAILS = [
+  "bscs25059@itu.edu.pk",
+  "anwartariqco@gmail.com",
+  "no.auth.verify@gmail.com",
+  "razamujtaba714@gmail.com"
+];
+
+function isEmailAdmin(email) {
+  if (!email) return false;
+  return ADMIN_EMAILS.includes(email.toLowerCase().trim());
+}
 
 function fmtDate(d) {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
@@ -74,8 +85,7 @@ export default function App() {
     try {
       const r = localStorage.getItem("adm-user");
       const u = r ? JSON.parse(r) : null;
-      const em = u?.email?.toLowerCase().trim() || "";
-      return ["anwartariqco@gmail.com", "no.auth.verify@gmail.com", "razamujtaba714@gmail.com"].includes(em) ? "team" : "my";
+      return isEmailAdmin(u?.email) ? "team" : "my";
     } catch {
       return "my";
     }
@@ -181,8 +191,7 @@ export default function App() {
       }
       setCurrentUser(data.user);
       localStorage.setItem("adm-user", JSON.stringify(data.user));
-      const em = data.user.email?.toLowerCase().trim() || "";
-      if (["anwartariqco@gmail.com", "no.auth.verify@gmail.com", "razamujtaba714@gmail.com"].includes(em)) {
+      if (isEmailAdmin(data.user.email)) {
         setViewMode("team");
       }
     } catch (err) {
@@ -391,15 +400,13 @@ export default function App() {
 
   const isAuthor = useMemo(() => {
     if (!currentUser) return false;
-    const email = (currentUser.email || "").toLowerCase().trim();
-    return ["anwartariqco@gmail.com", "no.auth.verify@gmail.com", "razamujtaba714@gmail.com"].includes(email);
+    return isEmailAdmin(currentUser.email);
   }, [currentUser]);
 
   const isAdminOrManager = useMemo(() => {
     if (!currentUser) return false;
-    const email = (currentUser.email || "").toLowerCase().trim();
     const r = (currentUser.role || "").toLowerCase().trim();
-    return ["anwartariqco@gmail.com", "no.auth.verify@gmail.com", "razamujtaba714@gmail.com"].includes(email) || ["partner", "manager", "admin"].includes(r);
+    return isEmailAdmin(currentUser.email) || ["partner", "manager", "admin"].includes(r);
   }, [currentUser]);
 
   const selDateStr = fmtDate(selDate);
