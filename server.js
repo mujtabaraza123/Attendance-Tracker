@@ -3,7 +3,9 @@ import cors from 'cors';
 import pkg from 'pg';
 import nodemailer from 'nodemailer';
 import { fileURLToPath } from 'url';
+import dotenv from 'dotenv';
 
+dotenv.config();
 const { Pool } = pkg;
 
 const app = express();
@@ -11,11 +13,11 @@ app.use(cors());
 app.use(express.json());
 
 const pool = new Pool({
-  host: process.env.DB_HOST || 'aws-0-ap-southeast-1.pooler.supabase.com',
-  port: parseInt(process.env.DB_PORT || '6543'),
-  database: process.env.DB_NAME || 'postgres',
-  user: process.env.DB_USER || 'postgres.tdnbheftrtcwnhejyvgc',
-  password: process.env.DB_PASSWORD || 'Hammad519..',
+  host: process.env.DB_HOST,
+  port: parseInt(process.env.DB_PORT),
+  database: process.env.DB_NAME,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
   ssl: { rejectUnauthorized: false },
   max: 10,
   idleTimeoutMillis: 30000,
@@ -28,8 +30,8 @@ const otpStore = new Map();
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
-    user: 'no.auth.verify@gmail.com',
-    pass: 'yzgl ngmr mqvt rccf',
+    user: process.env.GMAIL_USER,
+    pass: process.env.GMAIL_APP_PASSWORD,
   },
 });
 
