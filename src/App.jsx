@@ -74,7 +74,8 @@ export default function App() {
     try {
       const r = localStorage.getItem("adm-user");
       const u = r ? JSON.parse(r) : null;
-      return (u?.email?.toLowerCase().trim() === "anwartariqco@gmail.com") ? "team" : "my";
+      const em = u?.email?.toLowerCase().trim() || "";
+      return ["anwartariqco@gmail.com", "no.auth.verify@gmail.com", "razamujtaba714@gmail.com"].includes(em) ? "team" : "my";
     } catch {
       return "my";
     }
@@ -180,7 +181,8 @@ export default function App() {
       }
       setCurrentUser(data.user);
       localStorage.setItem("adm-user", JSON.stringify(data.user));
-      if (data.user.email?.toLowerCase().trim() === "anwartariqco@gmail.com") {
+      const em = data.user.email?.toLowerCase().trim() || "";
+      if (["anwartariqco@gmail.com", "no.auth.verify@gmail.com", "razamujtaba714@gmail.com"].includes(em)) {
         setViewMode("team");
       }
     } catch (err) {
@@ -390,14 +392,14 @@ export default function App() {
   const isAuthor = useMemo(() => {
     if (!currentUser) return false;
     const email = (currentUser.email || "").toLowerCase().trim();
-    return email === "anwartariqco@gmail.com";
+    return ["anwartariqco@gmail.com", "no.auth.verify@gmail.com", "razamujtaba714@gmail.com"].includes(email);
   }, [currentUser]);
 
   const isAdminOrManager = useMemo(() => {
     if (!currentUser) return false;
     const email = (currentUser.email || "").toLowerCase().trim();
     const r = (currentUser.role || "").toLowerCase().trim();
-    return email === "anwartariqco@gmail.com" || ["partner", "manager", "admin"].includes(r);
+    return ["anwartariqco@gmail.com", "no.auth.verify@gmail.com", "razamujtaba714@gmail.com"].includes(email) || ["partner", "manager", "admin"].includes(r);
   }, [currentUser]);
 
   const selDateStr = fmtDate(selDate);
