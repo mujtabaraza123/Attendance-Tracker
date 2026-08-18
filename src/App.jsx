@@ -47,6 +47,22 @@ function fmtDateTime(ts) {
     return "";
   }
 }
+function fmtAttendanceTime(ts, forDateStr) {
+  if (!ts) return "";
+  try {
+    const d = new Date(ts);
+    if (isNaN(d.getTime())) return "";
+    const timePart = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
+    const dStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+    if (forDateStr && dStr !== forDateStr) {
+      const datePart = d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+      return `${datePart}, ${timePart}`;
+    }
+    return timePart;
+  } catch {
+    return "";
+  }
+}
 function monthLabel(d) {
   return d.toLocaleDateString("en-US",{month:"long",year:"numeric"});
 }
@@ -144,7 +160,7 @@ export default function App() {
   const fetchData = useCallback(async (init = false) => {
     if (init) setLoading(true);
     try {
-      const res = await fetch("/api/all-data");
+      const res = await fetch(`/api/all-data?t=${Date.now()}`, { cache: "no-store" });
       if (!res.ok) throw new Error();
       const data = await res.json();
       if (data.success) {
@@ -447,10 +463,21 @@ export default function App() {
 
   const markAllPresent = async () => {
     const dateStr = fmtDate(selDate);
+    const nowIso  = new Date().toISOString();
     const next    = { ...attendance };
-    employees.forEach(emp => { next[`${emp.id}__${dateStr}`] = { status:"present", site: next[`${emp.id}__${dateStr}`]?.site||"" }; });
+    employees.forEach(emp => {
+      const key = `${emp.id}__${dateStr}`;
+      next[key] = { status:"present", site: next[key]?.site||"", updatedAt: nowIso };
+    });
     setAttendance(next);
-    try { await fetch("/api/mark-all-present",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({dateStr})}); fetchData(false); } catch {}
+    try {
+      await fetch("/api/mark-all-present", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dateStr })
+      });
+      fetchData(false);
+    } catch {}
   };
 
   // ── Employees ────────────────────────────────────────────────────────────────
@@ -925,8 +952,8 @@ export default function App() {
                       <span className="my-status-title">Status for {selDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
                       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                         {myTodayRec?.updatedAt && myTodayStatus && (
-                          <span className="my-att-time">
-                            <Clock size={11} /> {fmtTime(myTodayRec.updatedAt)}
+                          <span className="my-att-time" title={`Marked on: ${fmtDateTime(myTodayRec.updatedAt)}`}>
+                            <Clock size={11} /> Marked at {fmtAttendanceTime(myTodayRec.updatedAt, selDateStr)}
                           </span>
                         )}
                         {myTodayStatus ? (
@@ -1081,8 +1108,8 @@ export default function App() {
                             <div className="emp-name">{emp.name} {emp.id === myEmpId ? "(You)" : ""}</div>
                             <div className="emp-role">{emp.role}</div>
                             {rec?.updatedAt && cur && (
-                              <div className="emp-time">
-                                <Clock size={10} /> {fmtTime(rec.updatedAt)}
+                              <div className="emp-time" title={`Marked on: ${fmtDateTime(rec.updatedAt)}`}>
+                                <Clock size={10} /> {fmtAttendanceTime(rec.updatedAt, selDateStr)}
                               </div>
                             )}
                           </div>

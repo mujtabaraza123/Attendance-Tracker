@@ -279,6 +279,9 @@ app.post('/api/reset-password', async (req, res) => {
 
 // GET all employees, roles, and attendance records
 app.get('/api/all-data', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
   try {
     const empRes = await pool.query(`SELECT id, name, email, role FROM public.employees ORDER BY created_at ASC;`);
     const roleRes = await pool.query(`SELECT id, title FROM public.roles ORDER BY title ASC;`);
