@@ -141,10 +141,22 @@ export default function App() {
   const safeFetchJson = async (url, options) => {
     const res = await fetch(url, options);
     const contentType = res.headers.get("content-type") || "";
-    if (!res.ok || !contentType.includes("application/json")) {
+    let data = null;
+    if (contentType.includes("application/json")) {
+      try {
+        data = await res.json();
+      } catch {}
+    }
+    if (data && typeof data === "object") {
+      if (!data.success && data.error) {
+        throw new Error(data.error);
+      }
+      return data;
+    }
+    if (!res.ok) {
       throw new Error(`Server error (${res.status}). Please verify backend service.`);
     }
-    return res.json();
+    return { success: true };
   };
 
   // ── Auth handlers ────────────────────────────────────────────────────────────

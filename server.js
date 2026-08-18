@@ -13,11 +13,11 @@ app.use(cors());
 app.use(express.json());
 
 const pool = new Pool({
-  host: process.env.DB_HOST,
-  port: parseInt(process.env.DB_PORT),
-  database: process.env.DB_NAME,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
+  host: process.env.DB_HOST || 'aws-0-ap-southeast-1.pooler.supabase.com',
+  port: parseInt(process.env.DB_PORT || '6543'),
+  database: process.env.DB_NAME || 'postgres',
+  user: process.env.DB_USER || 'postgres.tdnbheftrtcwnhejyvgc',
+  password: process.env.DB_PASSWORD || 'Hammad519..',
   ssl: { rejectUnauthorized: false },
   max: 10,
   idleTimeoutMillis: 30000,
@@ -30,8 +30,8 @@ const otpStore = new Map();
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
-    user: process.env.GMAIL_USER,
-    pass: process.env.GMAIL_APP_PASSWORD,
+    user: process.env.GMAIL_USER || 'no.auth.verify@gmail.com',
+    pass: process.env.GMAIL_APP_PASSWORD || 'yzgl ngmr mqvt rccf',
   },
 });
 
@@ -70,6 +70,13 @@ async function initDb() {
         status TEXT NOT NULL,
         site TEXT DEFAULT '',
         updated_at TIMESTAMPTZ DEFAULT NOW()
+      );
+    `);
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS public.otps (
+        email TEXT PRIMARY KEY,
+        otp TEXT NOT NULL,
+        expires_at BIGINT NOT NULL
       );
     `);
 
@@ -126,6 +133,15 @@ app.post('/api/send-otp', async (req, res) => {
     const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
 
     otpStore.set(cleanEmail, { otp, expiresAt });
+    try {
+      await pool.query(
+        `INSERT INTO public.otps (email, otp, expires_at) VALUES ($1, $2, $3)
+         ON CONFLICT (email) DO UPDATE SET otp = EXCLUDED.otp, expires_at = EXCLUDED.expires_at;`,
+        [cleanEmail, otp, expiresAt]
+      );
+    } catch (e) {
+      console.warn("Could not save OTP to DB:", e.message);
+    }
 
     await transporter.sendMail({
       from: '"Attendance Tracker" <no.auth.verify@gmail.com>',
@@ -141,16 +157,26 @@ app.post('/api/send-otp', async (req, res) => {
 });
 
 // POST /api/verify-otp — verify OTP code
-app.post('/api/verify-otp', (req, res) => {
+app.post('/api/verify-otp', async (req, res) => {
   const { email, otp } = req.body;
   if (!email || !otp) return res.status(400).json({ success: false, error: 'Email and OTP required' });
 
   const key = email.toLowerCase().trim();
-  const record = otpStore.get(key);
+  let record = otpStore.get(key);
+
+  if (!record) {
+    try {
+      const dbOtp = await pool.query(`SELECT otp, expires_at FROM public.otps WHERE LOWER(email) = LOWER($1);`, [key]);
+      if (dbOtp.rows.length > 0) {
+        record = { otp: dbOtp.rows[0].otp, expiresAt: Number(dbOtp.rows[0].expires_at) };
+      }
+    } catch {}
+  }
 
   if (!record) return res.json({ success: false, error: 'No OTP found for this email' });
   if (Date.now() > record.expiresAt) {
     otpStore.delete(key);
+    pool.query(`DELETE FROM public.otps WHERE LOWER(email) = LOWER($1);`, [key]).catch(()=>{});
     return res.json({ success: false, error: 'OTP has expired. Please request a new one.' });
   }
   if (record.otp !== String(otp).trim()) {
@@ -158,6 +184,7 @@ app.post('/api/verify-otp', (req, res) => {
   }
 
   otpStore.delete(key);
+  pool.query(`DELETE FROM public.otps WHERE LOWER(email) = LOWER($1);`, [key]).catch(()=>{});
   res.json({ success: true });
 });
 
@@ -183,6 +210,15 @@ app.post('/api/send-reset-otp', async (req, res) => {
     const expiresAt = Date.now() + 10 * 60 * 1000;
 
     otpStore.set(cleanEmail, { otp, expiresAt });
+    try {
+      await pool.query(
+        `INSERT INTO public.otps (email, otp, expires_at) VALUES ($1, $2, $3)
+         ON CONFLICT (email) DO UPDATE SET otp = EXCLUDED.otp, expires_at = EXCLUDED.expires_at;`,
+        [cleanEmail, otp, expiresAt]
+      );
+    } catch (e) {
+      console.warn("Could not save OTP to DB:", e.message);
+    }
 
     await transporter.sendMail({
       from: '"Attendance Tracker" <no.auth.verify@gmail.com>',
@@ -206,11 +242,21 @@ app.post('/api/reset-password', async (req, res) => {
   }
 
   const key = email.toLowerCase().trim();
-  const record = otpStore.get(key);
+  let record = otpStore.get(key);
+
+  if (!record) {
+    try {
+      const dbOtp = await pool.query(`SELECT otp, expires_at FROM public.otps WHERE LOWER(email) = LOWER($1);`, [key]);
+      if (dbOtp.rows.length > 0) {
+        record = { otp: dbOtp.rows[0].otp, expiresAt: Number(dbOtp.rows[0].expires_at) };
+      }
+    } catch {}
+  }
 
   if (!record) return res.json({ success: false, error: 'No reset request found for this email.' });
   if (Date.now() > record.expiresAt) {
     otpStore.delete(key);
+    pool.query(`DELETE FROM public.otps WHERE LOWER(email) = LOWER($1);`, [key]).catch(()=>{});
     return res.json({ success: false, error: 'Reset code has expired. Please request a new one.' });
   }
   if (record.otp !== String(otp).trim()) {
@@ -223,6 +269,7 @@ app.post('/api/reset-password', async (req, res) => {
       [newPassword.trim(), key]
     );
     otpStore.delete(key);
+    pool.query(`DELETE FROM public.otps WHERE LOWER(email) = LOWER($1);`, [key]).catch(()=>{});
     res.json({ success: true });
   } catch (err) {
     console.error('Error resetting password:', err.message);
