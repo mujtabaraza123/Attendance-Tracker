@@ -387,6 +387,195 @@ input, button { font-family: inherit; }
 .danger-zone { margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--bd); }
 .danger-txt { font-size: 12px; color: var(--m); line-height: 1.5; }
 
+/* ── My Attendance & Profile Views ──────────────────────── */
+.my-hero-card {
+  background: var(--wh);
+  border: 1px solid var(--bd);
+  border-radius: var(--r);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+}
+.my-user-banner {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--bd);
+}
+.my-avatar-lg {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--c);
+  color: var(--wh);
+  font-size: 18px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.my-user-info { flex: 1; min-width: 0; }
+.my-user-name { font-size: 16px; font-weight: 800; color: var(--c); letter-spacing: -.2px; }
+.my-user-sub { display: flex; align-items: center; gap: 8px; margin-top: 2px; flex-wrap: wrap; }
+.my-role-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 100px;
+  background: #f1f5f9;
+  color: var(--c2);
+  font-size: 11px;
+  font-weight: 700;
+  border: 1px solid var(--bd);
+}
+.my-user-email { font-size: 12px; color: var(--m); }
+
+.my-status-box {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.my-status-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.my-status-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  color: var(--m);
+}
+.my-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 100px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+/* Metrics Grid */
+.my-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+.my-metric-tile {
+  background: var(--bg);
+  border: 1px solid var(--bd);
+  border-radius: var(--r);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 2px;
+}
+.my-metric-val {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--c);
+}
+.my-metric-lbl {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--m);
+  letter-spacing: .3px;
+}
+
+/* Profile Card */
+.profile-card {
+  background: var(--wh);
+  border: 1px solid var(--bd);
+  border-radius: var(--r);
+  padding: 24px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.profile-hdr {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.profile-avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--c);
+  color: var(--wh);
+  font-size: 22px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.profile-title { font-size: 18px; font-weight: 800; color: var(--c); }
+.profile-subtitle { font-size: 12px; color: var(--m); margin-top: 2px; }
+
+.profile-details-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+.profile-field {
+  background: var(--bg);
+  border: 1px solid var(--bd);
+  border-radius: 8px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.profile-field-lbl {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--m);
+  letter-spacing: .4px;
+}
+.profile-field-val {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--c);
+  word-break: break-all;
+}
+
+.view-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg);
+  padding: 3px;
+  border-radius: 8px;
+  border: 1px solid var(--bd);
+}
+.view-toggle-btn {
+  padding: 5px 10px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--m);
+  cursor: pointer;
+  transition: all .12s;
+}
+.view-toggle-btn.on {
+  background: var(--wh);
+  color: var(--c);
+  box-shadow: 0 1px 2px rgba(0,0,0,.05);
+}
+
 /* ── Mobile ─────────────────────────────────────────────── */
 @media (max-width: 600px) {
   /* Auth */
@@ -418,6 +607,8 @@ input, button { font-family: inherit; }
 
   /* Stats */
   .stat-nums { gap: 8px; }
+  .my-metrics-grid { grid-template-columns: repeat(2, 1fr); }
+  .profile-details-grid { grid-template-columns: 1fr; }
 
   /* Status buttons — 2 per row on very small screens */
   .status-btns { grid-template-columns: repeat(2, 1fr); }
@@ -429,3 +620,4 @@ input, button { font-family: inherit; }
   /* Table */
   .reg-tbl th, .reg-tbl td { padding: 5px 3px; }
 }
+
